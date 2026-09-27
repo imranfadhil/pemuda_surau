@@ -2,12 +2,18 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../lib/api.js';
 import { useAuth } from '../lib/auth.jsx';
-import { PRAYERS, SURAU } from '../lib/constants.js';
+import { PRAYERS, PRAYER_LABELS, SURAU } from '../lib/constants.js';
+
+function formatClock(iso) {
+  if (!iso) return '';
+  return new Date(iso).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+}
 
 export default function HomePage() {
   const { user } = useAuth();
   const [today, setToday] = useState([]);
   const [breakdown, setBreakdown] = useState(null);
+  const [win, setWin] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -18,9 +24,17 @@ export default function HomePage() {
       })
       .catch(() => {})
       .finally(() => setLoading(false));
+
+    const loadWindow = () => api.currentWindow().then(setWin).catch(() => {});
+    loadWindow();
+    const poll = setInterval(loadWindow, 60000);
+    return () => clearInterval(poll);
   }, []);
 
   const total = breakdown ? Object.values(breakdown).reduce((a, b) => a + b, 0) : 0;
+  const current = win?.current || null;
+  const next = win?.next || null;
+  const activePrayer = current?.prayer || null;
 
   return (
     <div>
@@ -60,11 +74,31 @@ export default function HomePage() {
             Check in
           </Link>
         </div>
+
+        {current ? (
+          <div className="alert alert-success" style={{ marginBottom: 14 }}>
+            <strong>{PRAYER_LABELS[current.prayer]}</strong> is open for check-in until{' '}
+            {formatClock(current.end)}.
+          </div>
+        ) : (
+          next && (
+            <div className="alert alert-info" style={{ marginBottom: 14 }}>
+              Next prayer: <strong>{PRAYER_LABELS[next.prayer]}</strong> at{' '}
+              {formatClock(next.adhan)}.
+            </div>
+          )
+        )}
+
         <div className="prayer-grid">
           {PRAYERS.map((p) => {
             const done = today.includes(p.key);
             return (
-              <div key={p.key} className={`prayer-tile ${done ? 'done' : ''}`}>
+              <div
+                key={p.key}
+                className={`prayer-tile ${done ? 'done' : ''} ${
+                  activePrayer === p.key ? 'active' : ''
+                }`}
+              >
                 <div className="check">{done ? '✅' : '⭕'}</div>
                 <div>{p.label}</div>
               </div>

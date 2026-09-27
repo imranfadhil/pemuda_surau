@@ -1,24 +1,59 @@
 import { useEffect, useRef, useState } from 'react';
 import { api } from '../lib/api.js';
 import { startCamera, stopCamera, captureDescriptor, loadModels } from '../lib/face.js';
-import { PRAYERS } from '../lib/constants.js';
+import { PRAYERS, PRAYER_LABELS } from '../lib/constants.js';
+
+function formatClock(iso) {
+  if (!iso) return '';
+  return new Date(iso).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+}
+
+function countdown(targetIso, now) {
+  if (!targetIso) return '';
+  const diff = new Date(targetIso).getTime() - now;
+  if (diff <= 0) return 'now';
+  const totalMin = Math.floor(diff / 60000);
+  const h = Math.floor(totalMin / 60);
+  const m = totalMin % 60;
+  return h > 0 ? `${h}h ${m}m` : `${m}m`;
+}
 
 export default function CheckInPage() {
   const videoRef = useRef(null);
   const streamRef = useRef(null);
 
-  const [prayer, setPrayer] = useState(PRAYERS[0].key);
   const [cameraOn, setCameraOn] = useState(false);
   const [status, setStatus] = useState('');
   const [error, setError] = useState('');
   const [result, setResult] = useState(null);
   const [busy, setBusy] = useState(false);
   const [today, setToday] = useState([]);
+  const [win, setWin] = useState(null);
+  const [now, setNow] = useState(Date.now());
+
+  function loadWindow() {
+    api
+      .currentWindow()
+      .then(setWin)
+      .catch(() => {});
+  }
 
   useEffect(() => {
     api.myToday().then((t) => setToday(t.prayers)).catch(() => {});
-    return () => stopCamera(streamRef.current);
+    loadWindow();
+    const poll = setInterval(loadWindow, 60000);
+    const tick = setInterval(() => setNow(Date.now()), 30000);
+    return () => {
+      clearInterval(poll);
+      clearInterval(tick);
+      stopCamera(streamRef.current);
+    };
   }, []);
+
+  const current = win?.current || null;
+  const next = win?.next || null;
+  const activePrayer = current?.prayer || null;
+  const alreadyDone = activePrayer ? today.includes(activePrayer) : false;
 
   async function enableCamera() {
     setError('');
@@ -45,15 +80,16 @@ export default function CheckInPage() {
         setStatus('No face detected. Move closer and improve lighting.');
         return;
       }
-      const res = await api.checkIn({
-        prayer,
-        descriptor: captured.descriptor,
-      });
+      // The server infers the prayer from the current window.
+      const res = await api.checkIn({ descriptor: captured.descriptor });
       setResult(res);
       setStatus('');
-      setToday((prev) => (prev.includes(prayer) ? prev : [...prev, prayer]));
+      setToday((prev) =>
+        prev.includes(res.attendance.prayer) ? prev : [...prev, res.attendance.prayer],
+      );
       stopCamera(streamRef.current);
       setCameraOn(false);
+      loadWindow();
     } catch (err) {
       setError(err.message);
       setStatus('');
@@ -65,27 +101,41 @@ export default function CheckInPage() {
   return (
     <div>
       <h1 className="page-title">Prayer check-in</h1>
-      <p className="page-sub">Select the prayer, then verify your face.</p>
+      <p className="page-sub">Your prayer is detected automatically from the current time.</p>
 
       <div className="card">
-        <h2 className="card-title">Which prayer?</h2>
-        <div className="tab-row" style={{ marginTop: 12 }}>
-          {PRAYERS.map((p) => (
-            <button
-              key={p.key}
-              className={`tab ${prayer === p.key ? 'active' : ''}`}
-              onClick={() => setPrayer(p.key)}
-            >
-              {p.label} {today.includes(p.key) ? '✓' : ''}
-            </button>
-          ))}
-        </div>
+        <h2 className="card-title">Current window</h2>
+        {!win ? (
+          <p className="muted" style={{ marginTop: 12 }}>Loading prayer times…</p>
+        ) : current ? (
+          <>
+            <div className="alert alert-success" style={{ marginTop: 12 }}>
+              <strong>{PRAYER_LABELS[current.prayer]}</strong> is open for check-in until{' '}
+              {formatClock(current.end)}.
+            </div>
+            <p className="muted">
+              Adhan {formatClock(current.adhan)} · window {formatClock(current.start)}–
+              {formatClock(current.end)}
+            </p>
+          </>
+        ) : (
+          <div className="alert alert-info" style={{ marginTop: 12 }}>
+            No prayer is open right now.
+            {next && (
+              <>
+                {' '}
+                Next: <strong>{PRAYER_LABELS[next.prayer]}</strong> at {formatClock(next.adhan)} (
+                in {countdown(next.start, now)}).
+              </>
+            )}
+          </div>
+        )}
 
         {error && <div className="alert alert-error">{error}</div>}
         {status && <div className="alert alert-info">{status}</div>}
         {result && (
           <div className="alert alert-success">
-            Checked in for <strong>{result.attendance.prayer}</strong>! Confidence{' '}
+            Checked in for <strong>{PRAYER_LABELS[result.attendance.prayer]}</strong>! Confidence{' '}
             {(result.confidence * 100).toFixed(1)}%
           </div>
         )}
@@ -97,13 +147,21 @@ export default function CheckInPage() {
 
         <div className="row" style={{ marginTop: 14 }}>
           {!cameraOn ? (
-            <button className="btn btn-block" onClick={enableCamera}>
-              Open camera
+            <button
+              className="btn btn-block"
+              disabled={!current || alreadyDone}
+              onClick={enableCamera}
+            >
+              {alreadyDone
+                ? `Already checked in for ${PRAYER_LABELS[activePrayer]}`
+                : current
+                  ? `Open camera for ${PRAYER_LABELS[activePrayer]}`
+                  : 'Check-in closed'}
             </button>
           ) : (
             <>
               <button className="btn" style={{ flex: 1 }} disabled={busy} onClick={verify}>
-                {busy ? 'Verifying…' : 'Verify & check in'}
+                {busy ? 'Verifying…' : `Verify & check in for ${PRAYER_LABELS[activePrayer]}`}
               </button>
               <button
                 className="btn btn-secondary"
@@ -124,7 +182,12 @@ export default function CheckInPage() {
         <h2 className="card-title">Today's progress</h2>
         <div className="prayer-grid" style={{ marginTop: 12 }}>
           {PRAYERS.map((p) => (
-            <div key={p.key} className={`prayer-tile ${today.includes(p.key) ? 'done' : ''}`}>
+            <div
+              key={p.key}
+              className={`prayer-tile ${today.includes(p.key) ? 'done' : ''} ${
+                activePrayer === p.key ? 'active' : ''
+              }`}
+            >
               <div className="check">{today.includes(p.key) ? '✅' : '⭕'}</div>
               <div>{p.label}</div>
             </div>

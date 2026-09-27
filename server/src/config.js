@@ -29,6 +29,19 @@ export const config = {
     mode: process.env.TELEGRAM_MODE || 'webhook',
     pollTimeoutSeconds: Number(process.env.TELEGRAM_POLL_TIMEOUT || 30),
   },
+  // Prayer times + automatic check-in windows (Aladhan API).
+  prayer: {
+    latitude: Number(process.env.PRAYER_LATITUDE || 2.93276),
+    longitude: Number(process.env.PRAYER_LONGITUDE || 101.8047),
+    timezone: process.env.PRAYER_TIMEZONE || 'Asia/Kuala_Lumpur',
+    // Aladhan calculation method id. 17 = JAKIM (Malaysia).
+    method: Number(process.env.PRAYER_CALC_METHOD || 17),
+    // Check-in window: opens N minutes before the adhan, closes M minutes after.
+    beforeMinutes: Number(process.env.PRAYER_WINDOW_BEFORE_MINUTES || 15),
+    afterMinutes: Number(process.env.PRAYER_WINDOW_AFTER_MINUTES || 60),
+    // When false, the client may pick any prayer (legacy behaviour).
+    enforceWindow: (process.env.PRAYER_WINDOW_ENFORCED || 'true') !== 'false',
+  },
   // How OTP codes are delivered: telegram | sms | console
   otpChannel: process.env.OTP_CHANNEL || 'console',
   // Public base URL of the app (used for Telegram webhook registration)

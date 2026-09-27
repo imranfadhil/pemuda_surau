@@ -15,7 +15,9 @@ statistics, rankings, and program management.
 - ✈️ **Free Telegram login codes** — no SMS charges, with admin-assisted fallback
 - 🧑 **Face enrollment & verification** — runs in the browser (face-api.js); only a 128-value
   descriptor is stored, never a photo
-- 🕌 **Prayer check-in** — Subuh, Zuhur, Asar, Maghrib, Isyak
+- 🕌 **Prayer check-in** — Subuh, Zuhur, Asar, Maghrib, Isyak. The prayer is detected
+  automatically from the current time; each prayer has a check-in window (15 min before the
+  adhan to 60 min after) fetched from the Aladhan API.
 - 🏆 **Dashboard & leaderboard** — stats, 7-day chart, per-prayer breakdown, rankings
 - 📅 **Programs** — upcoming activities with join/leave
 - ⚙️ **Admin panel** — manage members, view daily attendance, manual check-in

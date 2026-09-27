@@ -308,6 +308,11 @@ textarea:focus {
   color: var(--teal-900);
 }
 
+.prayer-tile.active {
+  border-color: var(--teal-500);
+  box-shadow: 0 0 0 3px var(--teal-100);
+}
+
 .prayer-tile .check {
   font-size: 1.4rem;
 }

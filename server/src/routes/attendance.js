@@ -5,27 +5,63 @@ import { config } from '../config.js';
 import { requireAuth, requireAdmin } from '../middleware/auth.js';
 import { asyncHandler, httpError } from '../middleware/errors.js';
 import { isValidDescriptor, findBestMatch } from '../utils/face.js';
+import { getCurrentWindow, getPrayerWindows, PRAYER_KEYS } from '../utils/prayerTimes.js';
+import { dateInTz } from '../utils/timezone.js';
 
 const router = Router();
 
-const PRAYERS = ['subuh', 'zuhur', 'asar', 'maghrib', 'isyak'];
+const PRAYERS = PRAYER_KEYS;
 
 const checkInSchema = z.object({
-  prayer: z.enum(PRAYERS),
+  // Optional: when omitted the server infers the prayer from the current window.
+  prayer: z.enum(PRAYERS).optional(),
   descriptor: z.array(z.number()).length(128),
   latitude: z.number().optional().nullable(),
   longitude: z.number().optional().nullable(),
 });
 
 function todayInTimezone() {
-  // Attendance day is based on the server's local date.
-  return new Date().toISOString().slice(0, 10);
+  // Attendance day is based on the surau's timezone, not the server's.
+  return dateInTz(new Date(), config.prayer.timezone);
 }
+
+function formatWindow(w) {
+  if (!w) return null;
+  return {
+    prayer: w.prayer,
+    adhan: w.adhan.toISOString(),
+    start: w.start.toISOString(),
+    end: w.end.toISOString(),
+  };
+}
+
+/**
+ * Which prayer is currently open for check-in, plus the next one.
+ * Used by the client to auto-select the prayer and show a countdown.
+ */
+router.get(
+  '/current',
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const { current, next, date } = await getCurrentWindow();
+    res.json({
+      date,
+      enforceWindow: config.prayer.enforceWindow,
+      windowBeforeMinutes: config.prayer.beforeMinutes,
+      windowAfterMinutes: config.prayer.afterMinutes,
+      current: formatWindow(current),
+      next: formatWindow(next),
+    });
+  }),
+);
 
 /**
  * Face-verified check-in.
  * The client sends the live face descriptor; we match it against all enrolled
  * users and record attendance for the best match within the threshold.
+ *
+ * The prayer is inferred from the current prayer-time window unless the client
+ * explicitly sends one (and window enforcement is disabled).
  */
 router.post(
   '/check-in',
@@ -33,9 +69,26 @@ router.post(
   asyncHandler(async (req, res) => {
     const parsed = checkInSchema.safeParse(req.body);
     if (!parsed.success) throw httpError(400, 'Invalid check-in payload');
-    const { prayer, descriptor, latitude, longitude } = parsed.data;
+    const { descriptor, latitude, longitude } = parsed.data;
 
     if (!isValidDescriptor(descriptor)) throw httpError(400, 'Invalid face descriptor');
+
+    // Resolve which prayer this check-in is for.
+    const { current } = await getCurrentWindow();
+    let prayer = parsed.data.prayer;
+
+    if (config.prayer.enforceWindow) {
+      if (!current) {
+        throw httpError(
+          409,
+          'No prayer is open for check-in right now. Please try again during the prayer window.',
+        );
+      }
+      prayer = current.prayer;
+    } else if (!prayer) {
+      if (!current) throw httpError(409, 'No prayer is open for check-in right now.');
+      prayer = current.prayer;
+    }
 
     const { rows: candidates } = await query(
       `SELECT id, full_name, face_descriptor FROM users
