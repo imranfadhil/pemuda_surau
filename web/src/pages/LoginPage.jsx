@@ -86,7 +86,7 @@ export default function LoginPage() {
   return (
     <div className="auth-wrap">
       <div className="auth-card">
-        <div className="auth-logo">🕌</div>
+        <img className="auth-logo" src="/logo.png" alt="" />
         <h1 className="center" style={{ margin: '0 0 4px', fontSize: '1.4rem' }}>
           {SURAU.name}
         </h1>

@@ -83,7 +83,7 @@ export default function RegisterPage() {
     <div className="app-shell">
       <header className="topbar">
         <div className="brand">
-          <span className="brand-logo">🕌</span>
+          <img className="brand-logo" src="/logo.png" alt="" />
           <span>Registration</span>
         </div>
       </header>
@@ -145,7 +145,7 @@ export default function RegisterPage() {
           {faceStatus && <div className="alert alert-info">{faceStatus}</div>}
 
           <div className="camera-wrap">
-            <video ref={videoRef} playsInline muted />
+            <video ref={videoRef} className="camera-mirror" playsInline muted />
             {cameraOn && <div className="camera-overlay" />}
             {cameraOn && <div className="camera-hint">Center your face in the frame</div>}
           </div>

@@ -147,7 +147,7 @@ export default function KioskDashboard() {
     <div className="kiosk">
       <header className="kiosk-header">
         <div className="kiosk-brand">
-          <span className="brand-logo">🕌</span>
+          <img className="brand-logo" src="/logo.png" alt="" />
           <div>
             <div className="kiosk-title">Pemuda {SURAU.name}</div>
             <div className="kiosk-sub">Prayer · Quran · Good Deeds</div>

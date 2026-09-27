@@ -34,7 +34,8 @@ export default function FaceScan({ onConfirmed, onCancel }) {
     setStatus('Loading face models…');
     try {
       await loadModels();
-      streamRef.current = await startCamera(videoRef.current);
+      // Staff scan another person's face, so use the rear camera.
+      streamRef.current = await startCamera(videoRef.current, 'environment');
       setCameraOn(true);
       setStatus('Center the member\'s face and tap Scan.');
     } catch (err) {

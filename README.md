@@ -88,6 +88,9 @@ dummy members with three months of backdated activity:
 docker compose exec -T api node scripts/simulate.mjs
 ```
 
+> Deploying to a droplet? Use `deploy\simulate.bat` instead — it resolves the droplet IP and
+> runs the same script over SSH (`simulate.bat --status`, `--clear`, `--total`, `--days`).
+
 This creates **60 members** (5 teachers, 10 AJK, 45 youths) with backdated attendance, Quran
 recitation/memorization logs, and merits. Every account is tagged `is_dummy = TRUE`.
 

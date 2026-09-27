@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import { Routes, Route, Navigate, NavLink, Link, useLocation } from 'react-router-dom';
 import { useAuth } from './lib/auth.jsx';
 import LoginPage from './pages/LoginPage.jsx';
@@ -15,6 +16,8 @@ import MeritsPage from './pages/MeritsPage.jsx';
 
 function BottomNav() {
   const { user } = useAuth();
+  const location = useLocation();
+  const navRef = useRef(null);
   const items = user
     ? [
         { to: '/', label: 'Dashboard', icon: '🏆' },
@@ -31,8 +34,16 @@ function BottomNav() {
   if (user?.role === 'admin') {
     items.push({ to: '/admin', label: 'Admin', icon: '⚙️' });
   }
+
+  // Admins get 7 items, which overflows a phone's width. Keep the active item
+  // scrolled into view so it is always visible (e.g. Admin when on /admin).
+  useEffect(() => {
+    const active = navRef.current?.querySelector('a.active');
+    active?.scrollIntoView({ inline: 'center', block: 'nearest' });
+  }, [location.pathname]);
+
   return (
-    <nav className="bottom-nav">
+    <nav className="bottom-nav" ref={navRef}>
       {items.map((item) => (
         <NavLink key={item.to} to={item.to} end={item.to === '/'}>
           <span className="nav-icon">{item.icon}</span>
@@ -48,7 +59,7 @@ function TopBar() {
   return (
     <header className="topbar">
       <Link className="brand" to="/">
-        <span className="brand-logo">🕌</span>
+        <img className="brand-logo" src="/logo.png" alt="" />
         <span>Pemuda Surau Al-Abqori</span>
       </Link>
       <div className="topbar-user">

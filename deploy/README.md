@@ -49,6 +49,7 @@ template defaults. Regenerate at any time with `seed-config.bat -Force`.
 | `sync.bat --restart` | Push code and force a Docker rebuild |
 | `seed-config.bat` | Generate `config.bat` from `.env` (`-Force` to regenerate) |
 | `backup.bat` | Manage database backups (`--list`, `--restore`, `--logs`) |
+| `simulate.bat` | Seed / clear demo data (`--clear`, `--status`, `--total`, `--teachers`, `--ajk`, `--days`) |
 | `destroy.bat` | Delete the droplet and the DO SSH key |
 
 ## Typical workflow
@@ -78,6 +79,30 @@ backup.bat              REM take a backup now
 backup.bat --list       REM list local + remote backups
 backup.bat --restore    REM restore the latest backup (DESTRUCTIVE)
 ```
+
+## Demo data
+
+`simulate.bat` seeds realistic dummy members (with backdated attendance, Quran logs and
+merits) so the dashboard and leaderboards can be demoed before go-live. Every account is
+tagged `is_dummy = TRUE`, so clearing only ever removes demo data — real accounts are
+untouched.
+
+```bat
+simulate.bat                       REM seed 60 members over 90 days
+simulate.bat --status              REM show dummy vs real counts
+simulate.bat --clear               REM remove all demo data
+simulate.bat --total 70 --teachers 6 --ajk 10 --days 90
+```
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `--total` | `60` | Total dummy members |
+| `--teachers` | `5` | How many are teachers |
+| `--ajk` | `10` | How many are AJK / committee |
+| `--days` | `90` | How many days to backdate |
+
+> Demo accounts use fake phone numbers (`+6019000xxxx`), so they cannot log in — they exist
+> only to populate the dashboard and leaderboards.
 
 ## What `deploy.bat` does
 

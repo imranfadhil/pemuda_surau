@@ -75,7 +75,12 @@ export default function CheckInPage() {
     setStatus('Loading face models…');
     try {
       await loadModels();
-      streamRef.current = await startCamera(videoRef.current);
+      // Scanning a dependent means the guardian is holding the phone up to the
+      // child, so use the rear camera; self check-in uses the front camera.
+      streamRef.current = await startCamera(
+        videoRef.current,
+        selected?.isDependent ? 'environment' : 'user',
+      );
       setCameraOn(true);
       setStatus(`Center ${selected?.isDependent ? `${selected.fullName}'s` : 'your'} face and tap Verify.`);
     } catch (err) {
@@ -199,7 +204,12 @@ export default function CheckInPage() {
         )}
 
         <div className="camera-wrap">
-          <video ref={videoRef} playsInline muted />
+          <video
+            ref={videoRef}
+            className={selected?.isDependent ? undefined : 'camera-mirror'}
+            playsInline
+            muted
+          />
           {cameraOn && <div className="camera-overlay" />}
         </div>
 

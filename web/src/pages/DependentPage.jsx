@@ -101,7 +101,8 @@ export default function DependentPage() {
     setEnrolling(dep);
     try {
       await loadModels();
-      streamRef.current = await startCamera(videoRef.current);
+      // A guardian enrolls a child's face, so use the rear camera.
+      streamRef.current = await startCamera(videoRef.current, 'environment');
       setCameraOn(true);
       setFaceStatus(`Center ${dep.fullName}'s face and tap Capture.`);
     } catch (err) {

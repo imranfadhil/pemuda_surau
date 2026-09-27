@@ -115,10 +115,12 @@ textarea:focus {
   width: 34px;
   height: 34px;
   border-radius: 10px;
-  background: var(--amber-400);
-  display: grid;
-  place-items: center;
-  font-size: 1.1rem;
+  /* The logo is a tall green mark on white; a white chip keeps it legible
+     against the teal topbar. */
+  background: white;
+  object-fit: contain;
+  padding: 3px;
+  box-sizing: border-box;
 }
 
 .topbar-user {
@@ -145,9 +147,22 @@ textarea:focus {
   background: white;
   border-top: 1px solid var(--slate-200);
   display: flex;
-  justify-content: space-around;
+  /* flex-start (not space-around): with overflow-x, space-around makes the
+     overflowing left edge unreachable. Items grow to fill when they fit. */
+  justify-content: flex-start;
   padding: 8px 4px calc(8px + env(safe-area-inset-bottom));
   z-index: 20;
+  /* Admins get 7 items, which overflows a phone's width. Allow horizontal
+     scrolling so every item (including Admin) stays reachable, and hide the
+     scrollbar so it still looks like a nav bar. */
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.bottom-nav::-webkit-scrollbar {
+  display: none;
 }
 
 .bottom-nav a {
@@ -157,9 +172,12 @@ textarea:focus {
   gap: 2px;
   font-size: 0.7rem;
   color: var(--slate-400);
-  padding: 4px 12px;
+  padding: 4px 10px;
   border-radius: 10px;
   font-weight: 600;
+  /* Grow to fill the bar when items fit; never shrink below content width. */
+  flex: 1 0 auto;
+  white-space: nowrap;
 }
 
 .bottom-nav a.active {
@@ -444,6 +462,11 @@ textarea:focus {
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+
+/* Mirror only the front camera (selfie view). The rear camera must not be
+   mirrored, or the preview looks reversed. */
+.camera-wrap video.camera-mirror {
   transform: scaleX(-1);
 }
 
@@ -582,11 +605,12 @@ textarea:focus {
   width: 56px;
   height: 56px;
   border-radius: 16px;
-  background: var(--amber-400);
-  display: grid;
-  place-items: center;
-  font-size: 1.8rem;
+  background: white;
+  object-fit: contain;
+  padding: 6px;
+  box-sizing: border-box;
   margin: 0 auto 16px;
+  display: block;
 }
 
 /* ---- Kiosk / wall display (non-scrolling) ---- */
@@ -619,7 +643,7 @@ textarea:focus {
   width: 52px;
   height: 52px;
   border-radius: 14px;
-  font-size: 1.7rem;
+  padding: 5px;
 }
 
 .kiosk-title {
