@@ -18,6 +18,8 @@ const checkInSchema = z.object({
   descriptor: z.array(z.number()).length(128),
   latitude: z.number().optional().nullable(),
   longitude: z.number().optional().nullable(),
+  // Optional: check in on behalf of a dependent (child) managed by the caller.
+  forUserId: z.string().uuid().optional(),
 });
 
 function todayInTimezone() {
@@ -69,9 +71,21 @@ router.post(
   asyncHandler(async (req, res) => {
     const parsed = checkInSchema.safeParse(req.body);
     if (!parsed.success) throw httpError(400, 'Invalid check-in payload');
-    const { descriptor, latitude, longitude } = parsed.data;
+    const { descriptor, latitude, longitude, forUserId } = parsed.data;
 
     if (!isValidDescriptor(descriptor)) throw httpError(400, 'Invalid face descriptor');
+
+    // A guardian may check in on behalf of a dependent (child) they manage.
+    // The verified face must belong to that dependent.
+    let targetUserId = req.user.sub;
+    if (forUserId && forUserId !== req.user.sub) {
+      const { rows: depRows } = await query(
+        `SELECT id FROM users WHERE id = $1 AND guardian_id = $2 AND is_active = TRUE`,
+        [forUserId, req.user.sub],
+      );
+      if (!depRows[0]) throw httpError(403, 'You can only check in for your own dependents.');
+      targetUserId = forUserId;
+    }
 
     // Resolve which prayer this check-in is for.
     const { current } = await getCurrentWindow();
@@ -100,9 +114,9 @@ router.post(
       throw httpError(401, 'Face not recognized. Please try again or see an admin.');
     }
 
-    // The verified face must belong to the logged-in user.
-    if (match.user.id !== req.user.sub) {
-      throw httpError(403, 'This face does not match your account.');
+    // The verified face must belong to the logged-in user (or their dependent).
+    if (match.user.id !== targetUserId) {
+      throw httpError(403, 'This face does not match the selected member.');
     }
 
     const date = todayInTimezone();
@@ -152,6 +166,57 @@ router.get(
   }),
 );
 
+/**
+ * Today's attendance for the current user and all their dependents.
+ * Used by the check-in page so a guardian can see who still needs checking in.
+ */
+router.get(
+  '/family/today',
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const date = todayInTimezone();
+    const { rows } = await query(
+      `SELECT u.id, u.full_name, u.guardian_id, u.face_descriptor IS NOT NULL AS has_face,
+              COALESCE(array_agg(a.prayer) FILTER (WHERE a.prayer IS NOT NULL), '{}') AS prayers
+       FROM users u
+       LEFT JOIN attendance a ON a.user_id = u.id AND a.attendance_date = $2
+       WHERE u.id = $1 OR u.guardian_id = $1
+       GROUP BY u.id
+       ORDER BY (u.guardian_id IS NOT NULL), u.created_at ASC`,
+      [req.user.sub, date],
+    );
+    res.json({
+      date,
+      members: rows.map((r) => ({
+        id: r.id,
+        fullName: r.full_name,
+        isDependent: Boolean(r.guardian_id),
+        hasFace: r.has_face,
+        prayers: r.prayers,
+      })),
+    });
+  }),
+);
+
+/** Attendance history for the current user and all their dependents. */
+router.get(
+  '/family',
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const limit = Math.min(Number(req.query.limit || 60), 365);
+    const { rows } = await query(
+      `SELECT a.*, u.full_name, u.guardian_id
+       FROM attendance a
+       JOIN users u ON u.id = a.user_id
+       WHERE u.id = $1 OR u.guardian_id = $1
+       ORDER BY a.attendance_date DESC, a.checked_in_at DESC
+       LIMIT $2`,
+      [req.user.sub, limit],
+    );
+    res.json({ attendance: rows });
+  }),
+);
+
 /** Admin: manual check-in on behalf of a user. */
 router.post(
   '/manual',
@@ -182,8 +247,10 @@ router.get(
   requireAdmin,
   asyncHandler(async (req, res) => {
     const { rows } = await query(
-      `SELECT a.*, u.full_name, u.phone
-       FROM attendance a JOIN users u ON u.id = a.user_id
+      `SELECT a.*, u.full_name, u.phone, u.guardian_id, g.full_name AS guardian_name
+       FROM attendance a
+       JOIN users u ON u.id = a.user_id
+       LEFT JOIN users g ON g.id = u.guardian_id
        WHERE a.attendance_date = $1
        ORDER BY a.prayer, a.checked_in_at`,
       [req.params.date],

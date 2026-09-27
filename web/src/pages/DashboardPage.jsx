@@ -120,6 +120,7 @@ export default function DashboardPage() {
                   {row.full_name} {isMe && <span className="pill">You</span>}
                   <div className="muted" style={{ fontWeight: 400 }}>
                     {row.days_attended} days
+                    {row.guardian_name ? ` · child of ${row.guardian_name}` : ''}
                   </div>
                 </div>
                 <div className="leader-score">{row.total}</div>

@@ -62,13 +62,15 @@ router.get(
     }
 
     const { rows } = await query(
-      `SELECT u.id, u.full_name, u.avatar_url,
+      `SELECT u.id, u.full_name, u.avatar_url, u.guardian_id,
+              g.full_name AS guardian_name,
               COUNT(a.id)::int AS total,
               COUNT(DISTINCT a.attendance_date)::int AS days_attended
        FROM users u
+       LEFT JOIN users g ON g.id = u.guardian_id
        LEFT JOIN attendance a ON a.user_id = u.id ${dateFilter}
        WHERE u.is_active = TRUE
-       GROUP BY u.id
+       GROUP BY u.id, g.full_name
        ORDER BY total DESC, days_attended DESC, u.full_name ASC
        LIMIT 100`,
       params,

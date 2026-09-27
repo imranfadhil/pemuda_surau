@@ -106,7 +106,8 @@ export default function AdminPage() {
                 <div className="leader-name">
                   {u.fullName}
                   <div className="muted" style={{ fontWeight: 400 }}>
-                    {u.phone} · {u.role}
+                    {u.phone || 'no phone (dependent)'} · {u.role}
+                    {u.guardianName ? ` · child of ${u.guardianName}` : ''}
                   </div>
                 </div>
                 <span className={`pill ${u.hasFace ? '' : 'warn'}`}>
@@ -117,7 +118,8 @@ export default function AdminPage() {
                 </span>
                 <button
                   className="btn btn-sm btn-secondary"
-                  disabled={codeBusy === u.id}
+                  disabled={codeBusy === u.id || !u.phone}
+                  title={u.phone ? undefined : 'Dependents have no phone to log in with'}
                   onClick={() => generateCode(u)}
                 >
                   {codeBusy === u.id ? '…' : 'Code'}
@@ -156,7 +158,8 @@ export default function AdminPage() {
                 <div className="leader-name">
                   {row.full_name}
                   <div className="muted" style={{ fontWeight: 400 }}>
-                    {PRAYER_LABELS[row.prayer]} · {row.phone}
+                    {PRAYER_LABELS[row.prayer]} · {row.phone || 'dependent'}
+                    {row.guardian_name ? ` · child of ${row.guardian_name}` : ''}
                   </div>
                 </div>
                 <span className="pill">{row.method}</span>
@@ -182,7 +185,7 @@ export default function AdminPage() {
               <option value="">Select member…</option>
               {users.map((u) => (
                 <option key={u.id} value={u.id}>
-                  {u.fullName} ({u.phone})
+                  {u.fullName} {u.phone ? `(${u.phone})` : '(dependent)'}
                 </option>
               ))}
             </select>

@@ -13,6 +13,8 @@ statistics, rankings, and program management.
 
 - 📱 **Phone + OTP login** — no passwords to remember
 - ✈️ **Free Telegram login codes** — no SMS charges, with admin-assisted fallback
+- 👨‍👩‍👧 **Family accounts** — parents can add children (dependents) who have no phone of
+  their own, enroll their faces, and check them in for prayers
 - 🧑 **Face enrollment & verification** — runs in the browser (face-api.js); only a 128-value
   descriptor is stored, never a photo
 - 🕌 **Prayer check-in** — Subuh, Zuhur, Asar, Maghrib, Isyak. The prayer is detected
@@ -159,6 +161,28 @@ Telegram allows only one delivery method at a time.
 In **Admin → Members**, each member has a **Code** button. It generates a one-time login code
 and displays it large on screen so the admin can read it to the member. Useful for anyone
 without Telegram or a working phone.
+
+## Family accounts (children without phones)
+
+Many youths don't have their own phone. A parent/guardian can register their children as
+**dependents** under their own account:
+
+1. Log in with your own phone number.
+2. Go to **Profile → Family → Manage** (or `/family`).
+3. **Add a dependent** — name, age, gender. No phone number is needed.
+4. **Enroll their face** — the guardian captures the child's face once.
+5. On the **Check-in** page, pick who is checking in (you or a child), then verify that
+   person's face. The server only accepts a face that belongs to the selected member.
+
+Dependents:
+
+- have **no phone and cannot log in** on their own (they are managed entirely by the guardian);
+- appear in the guardian's **attendance history**, the **leaderboard** (labelled as a child of
+  their guardian), and the admin's member/attendance lists;
+- are removed together with their attendance records when deleted.
+
+> **Note:** a dependent's face is matched against the selected member only, so a guardian
+> cannot accidentally check in as their child (or vice versa).
 
 ### SMS (optional, paid)
 

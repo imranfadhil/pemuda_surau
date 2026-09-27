@@ -7,6 +7,7 @@ import CheckInPage from './pages/CheckInPage.jsx';
 import DashboardPage from './pages/DashboardPage.jsx';
 import ProgramsPage from './pages/ProgramsPage.jsx';
 import ProfilePage from './pages/ProfilePage.jsx';
+import DependentPage from './pages/DependentPage.jsx';
 import AdminPage from './pages/AdminPage.jsx';
 
 function BottomNav() {
@@ -94,6 +95,7 @@ export default function App() {
                   <Route path="/dashboard" element={<DashboardPage />} />
                   <Route path="/programs" element={<ProgramsPage />} />
                   <Route path="/profile" element={<ProfilePage />} />
+                  <Route path="/family" element={<DependentPage />} />
                   <Route
                     path="/admin"
                     element={

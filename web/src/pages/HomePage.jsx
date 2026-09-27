@@ -12,15 +12,17 @@ function formatClock(iso) {
 export default function HomePage() {
   const { user } = useAuth();
   const [today, setToday] = useState([]);
+  const [family, setFamily] = useState([]);
   const [breakdown, setBreakdown] = useState(null);
   const [win, setWin] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    Promise.all([api.myToday(), api.myBreakdown()])
-      .then(([t, b]) => {
+    Promise.all([api.myToday(), api.myBreakdown(), api.familyToday()])
+      .then(([t, b, f]) => {
         setToday(t.prayers);
         setBreakdown(b.breakdown);
+        setFamily(f.members);
       })
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -35,6 +37,7 @@ export default function HomePage() {
   const current = win?.current || null;
   const next = win?.next || null;
   const activePrayer = current?.prayer || null;
+  const dependents = family.filter((m) => m.isDependent);
 
   return (
     <div>
@@ -106,6 +109,30 @@ export default function HomePage() {
           })}
         </div>
       </div>
+
+      {dependents.length > 0 && (
+        <div className="card">
+          <div className="row-between" style={{ marginBottom: 12 }}>
+            <h2 className="card-title">👨‍👩‍👧 Family today</h2>
+            <Link className="pill" to="/check-in">
+              Check in
+            </Link>
+          </div>
+          {dependents.map((m) => (
+            <div key={m.id} className="leader-row">
+              <div className="leader-name">
+                {m.fullName}
+                <div className="muted" style={{ fontWeight: 400 }}>
+                  {m.prayers.length}/5 prayers
+                </div>
+              </div>
+              <span className={`pill ${m.hasFace ? '' : 'warn'}`}>
+                {m.hasFace ? 'face ✓' : 'no face'}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
 
       <div className="card">
         <h2 className="card-title">Your breakdown</h2>

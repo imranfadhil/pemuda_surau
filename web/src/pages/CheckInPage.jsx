@@ -27,7 +27,8 @@ export default function CheckInPage() {
   const [error, setError] = useState('');
   const [result, setResult] = useState(null);
   const [busy, setBusy] = useState(false);
-  const [today, setToday] = useState([]);
+  const [members, setMembers] = useState([]);
+  const [selectedId, setSelectedId] = useState(null);
   const [win, setWin] = useState(null);
   const [now, setNow] = useState(Date.now());
 
@@ -38,8 +39,18 @@ export default function CheckInPage() {
       .catch(() => {});
   }
 
+  function loadFamily() {
+    api
+      .familyToday()
+      .then((data) => {
+        setMembers(data.members);
+        setSelectedId((prev) => prev || data.members[0]?.id || null);
+      })
+      .catch(() => {});
+  }
+
   useEffect(() => {
-    api.myToday().then((t) => setToday(t.prayers)).catch(() => {});
+    loadFamily();
     loadWindow();
     const poll = setInterval(loadWindow, 60000);
     const tick = setInterval(() => setNow(Date.now()), 30000);
@@ -50,6 +61,8 @@ export default function CheckInPage() {
     };
   }, []);
 
+  const selected = members.find((m) => m.id === selectedId) || members[0] || null;
+  const today = selected?.prayers || [];
   const current = win?.current || null;
   const next = win?.next || null;
   const activePrayer = current?.prayer || null;
@@ -62,7 +75,7 @@ export default function CheckInPage() {
       await loadModels();
       streamRef.current = await startCamera(videoRef.current);
       setCameraOn(true);
-      setStatus('Center your face and tap Verify.');
+      setStatus(`Center ${selected?.isDependent ? `${selected.fullName}'s` : 'your'} face and tap Verify.`);
     } catch (err) {
       setError(`Camera error: ${err.message}. Please allow camera access.`);
       setStatus('');
@@ -81,12 +94,12 @@ export default function CheckInPage() {
         return;
       }
       // The server infers the prayer from the current window.
-      const res = await api.checkIn({ descriptor: captured.descriptor });
+      const payload = { descriptor: captured.descriptor };
+      if (selected?.isDependent) payload.forUserId = selected.id;
+      const res = await api.checkIn(payload);
       setResult(res);
       setStatus('');
-      setToday((prev) =>
-        prev.includes(res.attendance.prayer) ? prev : [...prev, res.attendance.prayer],
-      );
+      loadFamily();
       stopCamera(streamRef.current);
       setCameraOn(false);
       loadWindow();
@@ -102,6 +115,28 @@ export default function CheckInPage() {
     <div>
       <h1 className="page-title">Prayer check-in</h1>
       <p className="page-sub">Your prayer is detected automatically from the current time.</p>
+
+      {members.length > 1 && (
+        <div className="card">
+          <h2 className="card-title">Who is checking in?</h2>
+          <div className="row" style={{ marginTop: 12, flexWrap: 'wrap', gap: 8 }}>
+            {members.map((m) => (
+              <button
+                key={m.id}
+                className={`btn btn-sm ${m.id === selected?.id ? '' : 'btn-secondary'}`}
+                onClick={() => {
+                  setSelectedId(m.id);
+                  setResult(null);
+                  setError('');
+                }}
+              >
+                {m.fullName}
+                {m.isDependent ? ' (child)' : ''}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="card">
         <h2 className="card-title">Current window</h2>
@@ -131,6 +166,14 @@ export default function CheckInPage() {
           </div>
         )}
 
+        {selected && !selected.hasFace && (
+          <div className="alert alert-info">
+            {selected.isDependent
+              ? `${selected.fullName} has no face enrolled yet. Ask your guardian to enroll it from the Family page.`
+              : 'You have no face enrolled yet. Please enroll your face first.'}
+          </div>
+        )}
+
         {error && <div className="alert alert-error">{error}</div>}
         {status && <div className="alert alert-info">{status}</div>}
         {result && (
@@ -149,7 +192,7 @@ export default function CheckInPage() {
           {!cameraOn ? (
             <button
               className="btn btn-block"
-              disabled={!current || alreadyDone}
+              disabled={!current || alreadyDone || !selected?.hasFace}
               onClick={enableCamera}
             >
               {alreadyDone
@@ -179,7 +222,9 @@ export default function CheckInPage() {
       </div>
 
       <div className="card">
-        <h2 className="card-title">Today's progress</h2>
+        <h2 className="card-title">
+          Today's progress{selected ? ` — ${selected.fullName}` : ''}
+        </h2>
         <div className="prayer-grid" style={{ marginTop: 12 }}>
           {PRAYERS.map((p) => (
             <div

@@ -92,12 +92,15 @@ function TelegramCard() {
 export default function ProfilePage() {
   const { user, logout } = useAuth();
   const [history, setHistory] = useState([]);
+  const [dependents, setDependents] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    api
-      .myAttendance(60)
-      .then((data) => setHistory(data.attendance))
+    Promise.all([api.familyAttendance(60), api.listDependents()])
+      .then(([data, deps]) => {
+        setHistory(data.attendance);
+        setDependents(deps.dependents);
+      })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
@@ -130,6 +133,35 @@ export default function ProfilePage() {
         </div>
       </div>
 
+      <div className="card">
+        <div className="row-between">
+          <h2 className="card-title">👨‍👩‍👧 Family</h2>
+          <Link className="pill" to="/family">
+            Manage
+          </Link>
+        </div>
+        <p className="muted" style={{ margin: '6px 0 12px' }}>
+          Add your children so you can check them in for prayers — they don't need their own phone.
+        </p>
+        {dependents.length === 0 ? (
+          <p className="muted">No dependents added yet.</p>
+        ) : (
+          dependents.map((dep) => (
+            <div key={dep.id} className="leader-row">
+              <div className="leader-name">
+                {dep.fullName}
+                <div className="muted" style={{ fontWeight: 400 }}>
+                  {dep.age ? `${dep.age} years` : 'Age not set'}
+                </div>
+              </div>
+              <span className={`pill ${dep.hasFace ? '' : 'warn'}`}>
+                {dep.hasFace ? 'face ✓' : 'no face'}
+              </span>
+            </div>
+          ))
+        )}
+      </div>
+
       <TelegramCard />
 
       <div className="card">
@@ -142,7 +174,7 @@ export default function ProfilePage() {
 
       <div className="card">
         <h2 className="card-title">Attendance history</h2>
-        <p className="muted" style={{ marginBottom: 12 }}>Most recent 60 records</p>
+        <p className="muted" style={{ marginBottom: 12 }}>You and your dependents — most recent 60 records</p>
         {loading ? (
           <p className="muted">Loading…</p>
         ) : history.length === 0 ? (
@@ -156,6 +188,7 @@ export default function ProfilePage() {
               <div className="leader-name">
                 {PRAYER_LABELS[row.prayer]}
                 <div className="muted" style={{ fontWeight: 400 }}>
+                  {row.guardian_id ? `${row.full_name} · ` : ''}
                   {formatDate(row.attendance_date)}
                 </div>
               </div>

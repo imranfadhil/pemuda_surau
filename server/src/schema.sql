@@ -3,12 +3,17 @@ CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
 CREATE TABLE IF NOT EXISTS users (
   id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  phone         TEXT UNIQUE NOT NULL,
+  -- Phone is the login identity. It is NULL for dependents (children) who are
+  -- managed by a guardian and have no phone of their own.
+  phone         TEXT UNIQUE,
   full_name     TEXT NOT NULL,
   age           INT,
   gender        TEXT CHECK (gender IN ('male', 'female')),
   address       TEXT,
   role          TEXT NOT NULL DEFAULT 'youth' CHECK (role IN ('youth', 'admin')),
+  -- When set, this account is a dependent (e.g. a child) managed by the
+  -- guardian user. Dependents cannot log in on their own.
+  guardian_id   UUID REFERENCES users(id) ON DELETE CASCADE,
   face_descriptor JSONB,
   face_enrolled_at TIMESTAMPTZ,
   avatar_url    TEXT,
@@ -97,6 +102,16 @@ CREATE TABLE IF NOT EXISTS settings (
 ALTER TABLE users ADD COLUMN IF NOT EXISTS telegram_chat_id TEXT;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS telegram_username TEXT;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS telegram_linked_at TIMESTAMPTZ;
+
+-- Dependents (children) managed by a guardian. Phone becomes optional so a
+-- dependent can exist without a phone number of their own.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS guardian_id UUID REFERENCES users(id) ON DELETE CASCADE;
+ALTER TABLE users ALTER COLUMN phone DROP NOT NULL;
+
+ALTER TABLE users DROP CONSTRAINT IF EXISTS users_no_self_guardian;
+ALTER TABLE users ADD CONSTRAINT users_no_self_guardian CHECK (guardian_id IS NULL OR guardian_id <> id);
+
+CREATE INDEX IF NOT EXISTS idx_users_guardian ON users (guardian_id) WHERE guardian_id IS NOT NULL;
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_users_telegram_chat
   ON users (telegram_chat_id) WHERE telegram_chat_id IS NOT NULL;

@@ -11,9 +11,15 @@ const router = Router();
 
 const profileSchema = z.object({
   fullName: z.string().min(2).max(120),
-  age: z.number().int().min(5).max(120).optional().nullable(),
+  age: z.number().int().min(1).max(120).optional().nullable(),
   gender: z.enum(['male', 'female']).optional().nullable(),
   address: z.string().max(300).optional().nullable(),
+});
+
+const dependentSchema = z.object({
+  fullName: z.string().min(2).max(120),
+  age: z.number().int().min(1).max(120).optional().nullable(),
+  gender: z.enum(['male', 'female']).optional().nullable(),
 });
 
 /** Update own profile. */
@@ -56,6 +62,95 @@ router.post(
   }),
 );
 
+/**
+ * Dependents (children) managed by the current user.
+ * A dependent has no phone of their own and cannot log in; the guardian
+ * enrolls their face and checks them in.
+ */
+router.get(
+  '/me/dependents',
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const { rows } = await query(
+      `SELECT * FROM users WHERE guardian_id = $1 ORDER BY created_at ASC`,
+      [req.user.sub],
+    );
+    res.json({ dependents: rows.map(publicUser) });
+  }),
+);
+
+/** Create a dependent under the current user. */
+router.post(
+  '/me/dependents',
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const parsed = dependentSchema.safeParse(req.body);
+    if (!parsed.success) throw httpError(400, 'Invalid dependent data');
+    const { fullName, age, gender } = parsed.data;
+
+    const { rows } = await query(
+      `INSERT INTO users (phone, full_name, age, gender, role, guardian_id)
+       VALUES (NULL, $1, $2, $3, 'youth', $4) RETURNING *`,
+      [fullName, age ?? null, gender ?? null, req.user.sub],
+    );
+    res.status(201).json({ dependent: publicUser(rows[0]) });
+  }),
+);
+
+/** Update a dependent owned by the current user. */
+router.put(
+  '/me/dependents/:id',
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const parsed = dependentSchema.safeParse(req.body);
+    if (!parsed.success) throw httpError(400, 'Invalid dependent data');
+    const { fullName, age, gender } = parsed.data;
+
+    const { rows } = await query(
+      `UPDATE users
+       SET full_name = $1, age = $2, gender = $3, updated_at = now()
+       WHERE id = $4 AND guardian_id = $5 RETURNING *`,
+      [fullName, age ?? null, gender ?? null, req.params.id, req.user.sub],
+    );
+    if (!rows[0]) throw httpError(404, 'Dependent not found');
+    res.json({ dependent: publicUser(rows[0]) });
+  }),
+);
+
+/** Enroll (or re-enroll) a face descriptor for a dependent. */
+router.post(
+  '/me/dependents/:id/face',
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const descriptor = req.body?.descriptor;
+    if (!isValidDescriptor(descriptor)) {
+      throw httpError(400, 'A valid 128-value face descriptor is required');
+    }
+    const { rows } = await query(
+      `UPDATE users
+       SET face_descriptor = $1, face_enrolled_at = now(), updated_at = now()
+       WHERE id = $2 AND guardian_id = $3 RETURNING *`,
+      [JSON.stringify(descriptor), req.params.id, req.user.sub],
+    );
+    if (!rows[0]) throw httpError(404, 'Dependent not found');
+    res.json({ ok: true, dependent: publicUser(rows[0]) });
+  }),
+);
+
+/** Remove a dependent (and their attendance, via ON DELETE CASCADE). */
+router.delete(
+  '/me/dependents/:id',
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const { rowCount } = await query(
+      `DELETE FROM users WHERE id = $1 AND guardian_id = $2`,
+      [req.params.id, req.user.sub],
+    );
+    if (!rowCount) throw httpError(404, 'Dependent not found');
+    res.json({ ok: true });
+  }),
+);
+
 /** Admin: list all users. */
 router.get(
   '/',
@@ -63,9 +158,14 @@ router.get(
   requireAdmin,
   asyncHandler(async (req, res) => {
     const { rows } = await query(
-      `SELECT * FROM users ORDER BY created_at DESC`,
+      `SELECT u.*, g.full_name AS guardian_name
+       FROM users u
+       LEFT JOIN users g ON g.id = u.guardian_id
+       ORDER BY u.created_at DESC`,
     );
-    res.json({ users: rows.map(publicUser) });
+    res.json({
+      users: rows.map((row) => ({ ...publicUser(row), guardianName: row.guardian_name || null })),
+    });
   }),
 );
 
@@ -100,6 +200,9 @@ router.post(
     const user = userRows[0];
     if (!user) throw httpError(404, 'User not found');
     if (!user.is_active) throw httpError(403, 'This account is deactivated');
+    if (!user.phone) {
+      throw httpError(400, 'This is a dependent account and has no phone number to log in with.');
+    }
 
     const code = generateOtp();
     const codeHash = await hashOtp(code);

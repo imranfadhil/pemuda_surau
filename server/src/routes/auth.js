@@ -90,6 +90,9 @@ router.post(
     }
 
     if (!user.is_active) throw httpError(403, 'This account has been deactivated');
+    if (user.guardian_id) {
+      throw httpError(403, 'This is a dependent account. Please ask your guardian to check in for you.');
+    }
 
     res.json({
       token: signToken(user),
@@ -124,6 +127,8 @@ export function publicUser(user) {
     avatarUrl: user.avatar_url,
     telegramLinked: Boolean(user.telegram_chat_id),
     telegramUsername: user.telegram_username || null,
+    guardianId: user.guardian_id || null,
+    isDependent: Boolean(user.guardian_id),
     createdAt: user.created_at,
   };
 }
