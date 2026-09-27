@@ -8,6 +8,7 @@ import { generateOtp, hashOtp, verifyOtp, otpExpiryDate, normalizePhone } from '
 import { deliverOtp, canReachUser } from '../utils/otpDelivery.js';
 import { isTelegramConfigured, buildBotUrl } from '../utils/telegram.js';
 import { capabilitiesFor } from '../utils/roles.js';
+import { ageFromBirthDate, toDateString } from '../utils/age.js';
 
 const router = Router();
 
@@ -148,7 +149,8 @@ export function publicUser(user) {
     id: user.id,
     phone: user.phone,
     fullName: user.full_name,
-    age: user.age,
+    birthDate: user.birth_date ? toDateString(user.birth_date) : null,
+    age: ageFromBirthDate(user.birth_date),
     gender: user.gender,
     address: user.address,
     role: user.role,

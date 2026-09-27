@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { api } from '../lib/api.js';
 import { startCamera, stopCamera, captureDescriptor, loadModels } from '../lib/face.js';
 import { getPosition } from '../lib/geo.js';
@@ -177,9 +178,14 @@ export default function CheckInPage() {
 
         {selected && !selected.hasFace && (
           <div className="alert alert-info">
-            {selected.isDependent
-              ? `${selected.fullName} has no face enrolled yet. Ask your guardian to enroll it from the Family page.`
-              : 'You have no face enrolled yet. Please enroll your face first.'}
+            {selected.isDependent ? (
+              `${selected.fullName} has no face enrolled yet. Ask your guardian to enroll it from the Family page.`
+            ) : (
+              <>
+                You need to register your face before you can check in.{' '}
+                <Link to="/register"><strong>Enroll your face →</strong></Link>
+              </>
+            )}
           </div>
         )}
 

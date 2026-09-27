@@ -14,15 +14,25 @@ export default function HomePage() {
   const [today, setToday] = useState([]);
   const [family, setFamily] = useState([]);
   const [breakdown, setBreakdown] = useState(null);
+  const [quran, setQuran] = useState(null);
+  const [merits, setMerits] = useState(null);
   const [win, setWin] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    Promise.all([api.myToday(), api.myBreakdown(), api.familyToday()])
-      .then(([t, b, f]) => {
+    Promise.all([
+      api.myToday(),
+      api.myBreakdown(),
+      api.familyToday(),
+      api.myQuran(),
+      api.myMerits(),
+    ])
+      .then(([t, b, f, q, m]) => {
         setToday(t.prayers);
         setBreakdown(b.breakdown);
         setFamily(f.members);
+        setQuran(q);
+        setMerits(m);
       })
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -42,7 +52,7 @@ export default function HomePage() {
   return (
     <div>
       <h1 className="page-title">Assalamualaikum, {user?.fullName?.split(' ')[0] || 'friend'} 👋</h1>
-      <p className="page-sub">Here is your prayer attendance today.</p>
+      <p className="page-sub">Your prayer, Quran and good deeds today.</p>
 
       <div className="card">
         <h2 className="card-title">🕌 {SURAU.name}</h2>
@@ -62,11 +72,23 @@ export default function HomePage() {
       <div className="stat-grid">
         <div className="stat">
           <div className="value">{loading ? '–' : today.length}/5</div>
-          <div className="label">Today</div>
+          <div className="label">🕌 Today</div>
         </div>
         <div className="stat">
           <div className="value">{loading ? '–' : total}</div>
-          <div className="label">Total check-ins</div>
+          <div className="label">🕌 Check-ins</div>
+        </div>
+        <div className="stat">
+          <div className="value">{loading ? '–' : quran?.recitation ?? 0}</div>
+          <div className="label">📖 Recitations</div>
+        </div>
+        <div className="stat">
+          <div className="value">{loading ? '–' : quran?.memorization ?? 0}</div>
+          <div className="label">🧠 Memorizations</div>
+        </div>
+        <div className="stat">
+          <div className="value">{loading ? '–' : merits?.total ?? 0}</div>
+          <div className="label">🏅 Merit points</div>
         </div>
       </div>
 
@@ -159,6 +181,36 @@ export default function HomePage() {
             </div>
           );
         })}
+      </div>
+
+      <div className="card">
+        <div className="row-between" style={{ marginBottom: 12 }}>
+          <h2 className="card-title">📖 Quran & 🏅 merits</h2>
+          <Link className="pill" to="/quran">
+            Log activity
+          </Link>
+        </div>
+        {merits?.merits?.length > 0 ? (
+          <>
+            <p className="muted" style={{ marginBottom: 6 }}>Recent merits</p>
+            {merits.merits.slice(0, 3).map((m) => (
+              <div key={m.id} className="leader-row">
+                <div className="leader-name">
+                  {m.reason || 'Good behaviour'}
+                  <div className="muted" style={{ fontWeight: 400 }}>
+                    {m.awarded_by_name ? `by ${m.awarded_by_name}` : 'awarded'}
+                  </div>
+                </div>
+                <div className="leader-score">+{m.points}</div>
+              </div>
+            ))}
+          </>
+        ) : (
+          <p className="muted">
+            No Quran activity or merits yet.{' '}
+            <Link to="/quran"><strong>Log your first recitation →</strong></Link>
+          </p>
+        )}
       </div>
     </div>
   );

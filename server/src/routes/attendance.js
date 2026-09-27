@@ -185,6 +185,23 @@ router.post(
       targetUserId = forUserId;
     }
 
+    // Members check themselves in, but only once their face is enrolled.
+    const { rows: targetRows } = await query(
+      `SELECT id, full_name, face_descriptor IS NOT NULL AS has_face
+       FROM users WHERE id = $1 AND is_active = TRUE`,
+      [targetUserId],
+    );
+    const target = targetRows[0];
+    if (!target) throw httpError(404, 'Member not found');
+    if (!target.has_face) {
+      throw httpError(
+        409,
+        targetUserId === req.user.sub
+          ? 'You need to register your face before you can check in. Open the Profile tab to enroll it.'
+          : `${target.full_name} has no face enrolled yet. Ask their guardian to enroll it first.`,
+      );
+    }
+
     // Resolve which prayer this check-in is for.
     const { current } = await getCurrentWindow();
     let prayer = parsed.data.prayer;

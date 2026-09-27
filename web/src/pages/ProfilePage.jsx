@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { api } from '../lib/api.js';
 import { useAuth } from '../lib/auth.jsx';
 import { PRAYER_LABELS, formatDate, SURAU, CATEGORIES, badgeFor, ROLE_LABELS } from '../lib/constants.js';
+import { ageLabel } from '../lib/age.js';
 
 function BadgesCard() {
   const [leaders, setLeaders] = useState([]);
@@ -203,7 +204,7 @@ export default function ProfilePage() {
               <div className="leader-name">
                 {dep.fullName}
                 <div className="muted" style={{ fontWeight: 400 }}>
-                  {dep.age ? `${dep.age} years` : 'Age not set'}
+                  {ageLabel(dep.birthDate)}
                 </div>
               </div>
               <span className={`pill ${dep.hasFace ? '' : 'warn'}`}>

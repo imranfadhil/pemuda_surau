@@ -12,14 +12,14 @@ const router = Router();
 
 const profileSchema = z.object({
   fullName: z.string().min(2).max(120),
-  age: z.number().int().min(1).max(120).optional().nullable(),
+  birthDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable(),
   gender: z.enum(['male', 'female']).optional().nullable(),
   address: z.string().max(300).optional().nullable(),
 });
 
 const dependentSchema = z.object({
   fullName: z.string().min(2).max(120),
-  age: z.number().int().min(1).max(120).optional().nullable(),
+  birthDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable(),
   gender: z.enum(['male', 'female']).optional().nullable(),
 });
 
@@ -30,13 +30,13 @@ router.put(
   asyncHandler(async (req, res) => {
     const parsed = profileSchema.safeParse(req.body);
     if (!parsed.success) throw httpError(400, 'Invalid profile data');
-    const { fullName, age, gender, address } = parsed.data;
+    const { fullName, birthDate, gender, address } = parsed.data;
 
     const { rows } = await query(
       `UPDATE users
-       SET full_name = $1, age = $2, gender = $3, address = $4, updated_at = now()
+       SET full_name = $1, birth_date = $2, gender = $3, address = $4, updated_at = now()
        WHERE id = $5 RETURNING *`,
-      [fullName, age ?? null, gender ?? null, address ?? null, req.user.sub],
+      [fullName, birthDate ?? null, gender ?? null, address ?? null, req.user.sub],
     );
     if (!rows[0]) throw httpError(404, 'User not found');
     res.json({ user: publicUser(rows[0]) });
@@ -87,12 +87,12 @@ router.post(
   asyncHandler(async (req, res) => {
     const parsed = dependentSchema.safeParse(req.body);
     if (!parsed.success) throw httpError(400, 'Invalid dependent data');
-    const { fullName, age, gender } = parsed.data;
+    const { fullName, birthDate, gender } = parsed.data;
 
     const { rows } = await query(
-      `INSERT INTO users (phone, full_name, age, gender, role, guardian_id)
+      `INSERT INTO users (phone, full_name, birth_date, gender, role, guardian_id)
        VALUES (NULL, $1, $2, $3, 'youth', $4) RETURNING *`,
-      [fullName, age ?? null, gender ?? null, req.user.sub],
+      [fullName, birthDate ?? null, gender ?? null, req.user.sub],
     );
     res.status(201).json({ dependent: publicUser(rows[0]) });
   }),
@@ -105,13 +105,13 @@ router.put(
   asyncHandler(async (req, res) => {
     const parsed = dependentSchema.safeParse(req.body);
     if (!parsed.success) throw httpError(400, 'Invalid dependent data');
-    const { fullName, age, gender } = parsed.data;
+    const { fullName, birthDate, gender } = parsed.data;
 
     const { rows } = await query(
       `UPDATE users
-       SET full_name = $1, age = $2, gender = $3, updated_at = now()
+       SET full_name = $1, birth_date = $2, gender = $3, updated_at = now()
        WHERE id = $4 AND guardian_id = $5 RETURNING *`,
-      [fullName, age ?? null, gender ?? null, req.params.id, req.user.sub],
+      [fullName, birthDate ?? null, gender ?? null, req.params.id, req.user.sub],
     );
     if (!rows[0]) throw httpError(404, 'Dependent not found');
     res.json({ dependent: publicUser(rows[0]) });

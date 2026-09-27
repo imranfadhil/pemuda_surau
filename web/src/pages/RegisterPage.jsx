@@ -12,7 +12,7 @@ export default function RegisterPage() {
 
   const [form, setForm] = useState({
     fullName: user?.fullName && user.fullName !== 'New Member' ? user.fullName : '',
-    age: user?.age || '',
+    birthDate: user?.birthDate || '',
     gender: user?.gender || '',
     address: user?.address || '',
   });
@@ -34,7 +34,7 @@ export default function RegisterPage() {
     try {
       await api.updateProfile({
         fullName: form.fullName,
-        age: form.age ? Number(form.age) : null,
+        birthDate: form.birthDate || null,
         gender: form.gender || null,
         address: form.address || null,
       });
@@ -105,14 +105,13 @@ export default function RegisterPage() {
           </div>
           <div className="row">
             <div className="field" style={{ flex: 1 }}>
-              <label htmlFor="age">Age</label>
+              <label htmlFor="birthDate">Date of birth</label>
               <input
-                id="age"
-                type="number"
-                min="5"
-                max="120"
-                value={form.age}
-                onChange={(e) => update('age', e.target.value)}
+                id="birthDate"
+                type="date"
+                max={new Date().toISOString().slice(0, 10)}
+                value={form.birthDate}
+                onChange={(e) => update('birthDate', e.target.value)}
               />
             </div>
             <div className="field" style={{ flex: 1 }}>

@@ -7,7 +7,8 @@ CREATE TABLE IF NOT EXISTS users (
   -- managed by a guardian and have no phone of their own.
   phone         TEXT UNIQUE,
   full_name     TEXT NOT NULL,
-  age           INT,
+  -- Age is derived from birth_date (see utils/age.js), never stored directly.
+  birth_date    DATE,
   gender        TEXT CHECK (gender IN ('male', 'female')),
   address       TEXT,
   role          TEXT NOT NULL DEFAULT 'youth' CHECK (role IN ('youth', 'admin', 'parent', 'teacher', 'ajk')),
@@ -180,3 +181,7 @@ ALTER TABLE programs ADD CONSTRAINT programs_created_by_fkey
 -- Record who submitted each Quran log (NULL = the member logged it themselves).
 ALTER TABLE quran_logs ADD COLUMN IF NOT EXISTS logged_by UUID REFERENCES users(id) ON DELETE SET NULL;
 CREATE INDEX IF NOT EXISTS idx_quran_logged_by ON quran_logs (logged_by) WHERE logged_by IS NOT NULL;
+
+-- Age is now derived from birth_date instead of being stored directly.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS birth_date DATE;
+ALTER TABLE users DROP COLUMN IF EXISTS age;

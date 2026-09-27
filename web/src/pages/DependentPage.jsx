@@ -2,8 +2,9 @@ import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../lib/api.js';
 import { startCamera, stopCamera, captureDescriptor, loadModels } from '../lib/face.js';
+import { ageLabel } from '../lib/age.js';
 
-const emptyForm = { fullName: '', age: '', gender: 'male' };
+const emptyForm = { fullName: '', birthDate: '', gender: 'male' };
 
 export default function DependentPage() {
   const [dependents, setDependents] = useState([]);
@@ -41,7 +42,7 @@ export default function DependentPage() {
 
   function startEdit(dep) {
     setEditingId(dep.id);
-    setForm({ fullName: dep.fullName, age: dep.age || '', gender: dep.gender || 'male' });
+    setForm({ fullName: dep.fullName, birthDate: dep.birthDate || '', gender: dep.gender || 'male' });
     setError('');
     setNotice('');
   }
@@ -58,7 +59,7 @@ export default function DependentPage() {
     setBusy(true);
     const payload = {
       fullName: form.fullName,
-      age: form.age ? Number(form.age) : null,
+      birthDate: form.birthDate || null,
       gender: form.gender || null,
     };
     try {
@@ -160,14 +161,13 @@ export default function DependentPage() {
         </div>
         <div className="row">
           <div className="field" style={{ flex: 1 }}>
-            <label htmlFor="depAge">Age</label>
+            <label htmlFor="depBirthDate">Date of birth</label>
             <input
-              id="depAge"
-              type="number"
-              min="1"
-              max="120"
-              value={form.age}
-              onChange={(e) => update('age', e.target.value)}
+              id="depBirthDate"
+              type="date"
+              max={new Date().toISOString().slice(0, 10)}
+              value={form.birthDate}
+              onChange={(e) => update('birthDate', e.target.value)}
             />
           </div>
           <div className="field" style={{ flex: 1 }}>
@@ -209,7 +209,7 @@ export default function DependentPage() {
                 <div className="leader-name">
                   {dep.fullName}
                   <div className="muted" style={{ fontWeight: 400 }}>
-                    {dep.age ? `${dep.age} years` : 'Age not set'}
+                    {ageLabel(dep.birthDate)}
                     {dep.gender ? ` · ${dep.gender}` : ''}
                   </div>
                 </div>

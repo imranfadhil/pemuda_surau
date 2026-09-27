@@ -115,7 +115,9 @@ async function seed() {
     const users = roles.map((role, i) => ({
       phone: `+6019000${String(i + 1).padStart(4, '0')}`,
       fullName: nextName(),
-      age: 15 + Math.floor(Math.random() * 30),
+      // Birth date instead of age; age is derived on read. Inlined as a SQL
+      // expression (not a parameter) so each row gets its own value.
+      birthDate: `(CURRENT_DATE - interval '${15 + Math.floor(Math.random() * 30)} years')::date`,
       gender: Math.random() < 0.5 ? 'male' : 'female',
       role,
       // Spread sign-ups across the backdated window.
@@ -126,13 +128,15 @@ async function seed() {
     const userValues = [];
     const userParams = [];
     users.forEach((u, i) => {
-      const b = i * 5;
-      userValues.push(`($${b + 1}, $${b + 2}, $${b + 3}, $${b + 4}, $${b + 5}, TRUE, ${u.createdAt})`);
-      userParams.push(u.phone, u.fullName, u.age, u.gender, u.role);
+      const b = i * 4;
+      userValues.push(
+        `($${b + 1}, $${b + 2}, ${u.birthDate}, $${b + 3}, $${b + 4}, TRUE, ${u.createdAt})`,
+      );
+      userParams.push(u.phone, u.fullName, u.gender, u.role);
     });
 
     await client.query(
-      `INSERT INTO users (phone, full_name, age, gender, role, is_dummy, created_at)
+      `INSERT INTO users (phone, full_name, birth_date, gender, role, is_dummy, created_at)
        VALUES ${userValues.join(', ')}`,
       userParams,
     );

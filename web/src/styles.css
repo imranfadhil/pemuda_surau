@@ -373,6 +373,16 @@ textarea:focus {
 }
 
 /* ---- Leaderboard ---- */
+/* Scrollable list so a long leaderboard doesn't push the rest of the page
+   far down. Fades at the bottom to hint there is more to scroll. */
+.leader-scroll {
+  max-height: 420px;
+  overflow-y: auto;
+  margin-top: 4px;
+  padding-right: 4px;
+  -webkit-overflow-scrolling: touch;
+}
+
 .leader-row {
   display: flex;
   align-items: center;
