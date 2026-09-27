@@ -13,6 +13,7 @@ import attendanceRoutes from './routes/attendance.js';
 import dashboardRoutes from './routes/dashboard.js';
 import programRoutes from './routes/programs.js';
 import telegramRoutes from './routes/telegram.js';
+import activityRoutes from './routes/activity.js';
 
 const app = express();
 
@@ -47,6 +48,7 @@ app.use('/api/attendance', attendanceRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/programs', programRoutes);
 app.use('/api/telegram', telegramRoutes);
+app.use('/api/activity', activityRoutes);
 
 app.use(notFound);
 app.use(errorHandler);

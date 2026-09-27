@@ -7,6 +7,7 @@ import { asyncHandler, httpError } from '../middleware/errors.js';
 import { generateOtp, hashOtp, verifyOtp, otpExpiryDate, normalizePhone } from '../utils/otp.js';
 import { deliverOtp, canReachUser } from '../utils/otpDelivery.js';
 import { isTelegramConfigured, buildBotUrl } from '../utils/telegram.js';
+import { capabilitiesFor } from '../utils/roles.js';
 
 const router = Router();
 
@@ -151,6 +152,7 @@ export function publicUser(user) {
     gender: user.gender,
     address: user.address,
     role: user.role,
+    capabilities: capabilitiesFor(user.role),
     hasFace: Boolean(user.face_descriptor),
     avatarUrl: user.avatar_url,
     telegramLinked: Boolean(user.telegram_chat_id),

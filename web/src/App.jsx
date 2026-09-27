@@ -1,5 +1,6 @@
 import { Routes, Route, Navigate, NavLink, Link, useLocation } from 'react-router-dom';
 import { useAuth } from './lib/auth.jsx';
+import { can } from './lib/constants.js';
 import LoginPage from './pages/LoginPage.jsx';
 import RegisterPage from './pages/RegisterPage.jsx';
 import HomePage from './pages/HomePage.jsx';
@@ -26,6 +27,8 @@ function BottomNav() {
       ];
   if (user?.role === 'admin') {
     items.push({ to: '/admin', label: 'Admin', icon: '⚙️' });
+  } else if (can(user, 'manageMerits') || can(user, 'manageQuran')) {
+    items.push({ to: '/admin', label: 'Staff', icon: '🧑‍🏫' });
   }
   return (
     <nav className="bottom-nav">
@@ -75,7 +78,9 @@ function Protected({ children }) {
 
 function AdminOnly({ children }) {
   const { user } = useAuth();
-  if (user?.role !== 'admin') return <Navigate to="/" replace />;
+  if (!can(user, 'manageMerits') && !can(user, 'manageQuran') && user?.role !== 'admin') {
+    return <Navigate to="/" replace />;
+  }
   return children;
 }
 

@@ -1,5 +1,6 @@
 import jwt from 'jsonwebtoken';
 import { config } from '../config.js';
+import { roleHasCapability } from '../utils/roles.js';
 
 export function signToken(user) {
   return jwt.sign(
@@ -28,4 +29,17 @@ export function requireAdmin(req, res, next) {
     return res.status(403).json({ error: 'Admin access required' });
   }
   return next();
+}
+
+/**
+ * Require a specific capability (see utils/roles.js). Admins implicitly hold
+ * every capability, so `requireCapability('manageMerits')` also admits admins.
+ */
+export function requireCapability(capability) {
+  return (req, res, next) => {
+    if (!roleHasCapability(req.user?.role, capability)) {
+      return res.status(403).json({ error: 'You do not have permission to do this' });
+    }
+    return next();
+  };
 }

@@ -189,26 +189,72 @@ textarea:focus {
   margin: 0 0 4px;
 }
 
-/* ---- Login QR card ---- */
-.qr-card {
+/* ---- Login QR (floating, bottom right) ---- */
+.qr-float {
+  position: fixed;
+  right: 20px;
+  bottom: 84px;
+  z-index: 30;
   display: flex;
-  align-items: center;
-  gap: 20px;
-  flex-wrap: wrap;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+}
+
+.qr-float-panel {
+  background: white;
+  border-radius: 16px;
+  padding: 14px;
+  width: 220px;
+  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.22);
+  border: 1px solid var(--slate-100);
 }
 
 .qr-box {
   background: white;
-  padding: 10px;
-  border-radius: 14px;
+  padding: 8px;
+  border-radius: 12px;
   border: 1px solid var(--slate-200);
   line-height: 0;
-  flex-shrink: 0;
+  display: grid;
+  place-items: center;
 }
 
-.qr-info {
-  flex: 1;
-  min-width: 200px;
+.qr-fab {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--teal-700);
+  color: white;
+  font-size: 1.4rem;
+  box-shadow: 0 10px 24px rgba(15, 118, 110, 0.4);
+  display: grid;
+  place-items: center;
+}
+
+.qr-fab:hover {
+  background: var(--teal-600);
+}
+
+.qr-close {
+  background: transparent;
+  color: var(--slate-600);
+  font-size: 0.9rem;
+  padding: 2px 6px;
+}
+
+/* ---- Badges ---- */
+.badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  background: linear-gradient(135deg, #fef3c7, #fde68a);
+  color: #92400e;
+  border: 1px solid #fcd34d;
+  vertical-align: middle;
 }
 
 .muted {

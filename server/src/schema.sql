@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS users (
   age           INT,
   gender        TEXT CHECK (gender IN ('male', 'female')),
   address       TEXT,
-  role          TEXT NOT NULL DEFAULT 'youth' CHECK (role IN ('youth', 'admin')),
+  role          TEXT NOT NULL DEFAULT 'youth' CHECK (role IN ('youth', 'admin', 'parent', 'teacher', 'ajk')),
   -- When set, this account is a dependent (e.g. a child) managed by the
   -- guardian user. Dependents cannot log in on their own.
   guardian_id   UUID REFERENCES users(id) ON DELETE CASCADE,
@@ -97,6 +97,37 @@ CREATE TABLE IF NOT EXISTS settings (
 );
 
 -- ---------------------------------------------------------------------------
+-- Gamification: merits (admin-awarded) and Quran activity (recitation /
+-- memorization). These feed the dashboard leaderboard categories.
+-- ---------------------------------------------------------------------------
+
+-- Merits: points awarded by an admin for good behaviour / contributions.
+CREATE TABLE IF NOT EXISTS merits (
+  id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id    UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  points     INT NOT NULL DEFAULT 1 CHECK (points <> 0),
+  reason     TEXT NOT NULL,
+  awarded_by UUID REFERENCES users(id),
+  awarded_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_merits_user ON merits (user_id, awarded_at DESC);
+
+-- Quran activity: recitation and memorization logs (self-logged or by a guardian).
+CREATE TABLE IF NOT EXISTS quran_logs (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  kind        TEXT NOT NULL CHECK (kind IN ('recitation', 'memorization')),
+  surah       TEXT,
+  juz         INT,
+  pages       INT,
+  note        TEXT,
+  logged_date DATE NOT NULL DEFAULT CURRENT_DATE,
+  logged_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_quran_user ON quran_logs (user_id, logged_date DESC);
+CREATE INDEX IF NOT EXISTS idx_quran_date ON quran_logs (logged_date DESC);
+
+-- ---------------------------------------------------------------------------
 -- Idempotent migrations for databases created before these columns existed.
 -- ---------------------------------------------------------------------------
 ALTER TABLE users ADD COLUMN IF NOT EXISTS telegram_chat_id TEXT;
@@ -115,3 +146,9 @@ CREATE INDEX IF NOT EXISTS idx_users_guardian ON users (guardian_id) WHERE guard
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_users_telegram_chat
   ON users (telegram_chat_id) WHERE telegram_chat_id IS NOT NULL;
+
+-- Roles: admin (full), parent (children + check-in), teacher (Quran + merits),
+-- ajk (merits), youth (basic member). Widen the CHECK for existing databases.
+ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check;
+ALTER TABLE users ADD CONSTRAINT users_role_check
+  CHECK (role IN ('youth', 'admin', 'parent', 'teacher', 'ajk'));

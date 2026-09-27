@@ -1,0 +1,49 @@
+/**
+ * Role-based access control.
+ *
+ * Roles:
+ *   admin   - full access
+ *   parent  - manage children + prayer check-in
+ *   teacher - prayer check-in + Quran (recitation/memorization) + merits
+ *   ajk     - prayer check-in + merits
+ *   youth   - basic member (prayer check-in only)
+ *
+ * Capabilities are the single source of truth for what a role may do. Both the
+ * server middleware and the client (via `publicUser.capabilities`) use the same
+ * names, so the UI and API stay in sync.
+ */
+
+export const ROLES = ['admin', 'parent', 'teacher', 'ajk', 'youth'];
+
+export const ROLE_LABELS = {
+  admin: 'Admin',
+  parent: 'Parent',
+  teacher: 'Teacher',
+  ajk: 'AJK / Committee',
+  youth: 'Member',
+};
+
+export const CAPABILITIES = {
+  admin: [
+    'manageUsers',
+    'managePrograms',
+    'manageMerits',
+    'manageQuran',
+    'manageAttendance',
+    'manageDependents',
+    'viewMembers',
+    'checkIn',
+  ],
+  parent: ['manageDependents', 'checkIn'],
+  teacher: ['manageQuran', 'manageMerits', 'viewMembers', 'checkIn'],
+  ajk: ['manageMerits', 'viewMembers', 'checkIn'],
+  youth: ['checkIn'],
+};
+
+export function capabilitiesFor(role) {
+  return CAPABILITIES[role] || CAPABILITIES.youth;
+}
+
+export function roleHasCapability(role, capability) {
+  return capabilitiesFor(role).includes(capability);
+}

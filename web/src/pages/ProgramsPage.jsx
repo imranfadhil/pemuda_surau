@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '../lib/api.js';
 import { useAuth } from '../lib/auth.jsx';
-import { formatDateTime } from '../lib/constants.js';
+import { formatDateTime, can } from '../lib/constants.js';
 
 function ProgramCard({ program, isAdmin, onChanged }) {
   const [busy, setBusy] = useState(false);
@@ -69,7 +69,7 @@ function ProgramCard({ program, isAdmin, onChanged }) {
 
 export default function ProgramsPage() {
   const { user } = useAuth();
-  const isAdmin = user?.role === 'admin';
+  const isAdmin = can(user, 'managePrograms');
   const [programs, setPrograms] = useState([]);
   const [includePast, setIncludePast] = useState(false);
   const [loading, setLoading] = useState(true);

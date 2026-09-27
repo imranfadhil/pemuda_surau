@@ -2,7 +2,203 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../lib/api.js';
 import { useAuth } from '../lib/auth.jsx';
-import { PRAYER_LABELS, formatDate, SURAU } from '../lib/constants.js';
+import { PRAYER_LABELS, formatDate, SURAU, CATEGORIES, badgeFor, ROLE_LABELS } from '../lib/constants.js';
+
+function QuranCard() {
+  const [data, setData] = useState({ recitation: 0, memorization: 0, logs: [] });
+  const [form, setForm] = useState({ kind: 'recitation', surah: '', juz: '', pages: '', note: '' });
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  function load() {
+    api.myQuran().then(setData).catch((e) => setError(e.message));
+  }
+
+  useEffect(load, []);
+
+  async function submit(e) {
+    e.preventDefault();
+    setError('');
+    setBusy(true);
+    try {
+      await api.logQuran({
+        kind: form.kind,
+        surah: form.surah || null,
+        juz: form.juz ? Number(form.juz) : null,
+        pages: form.pages ? Number(form.pages) : null,
+        note: form.note || null,
+      });
+      setForm({ kind: form.kind, surah: '', juz: '', pages: '', note: '' });
+      load();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function remove(id) {
+    setError('');
+    try {
+      await api.deleteQuran(id);
+      load();
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
+  return (
+    <div className="card">
+      <h2 className="card-title">📖 Quran activity</h2>
+      <p className="muted" style={{ marginBottom: 12 }}>
+        Log your recitation and memorization to earn badges and climb the leaderboard.
+      </p>
+
+      {error && <div className="alert alert-error">{error}</div>}
+
+      <div className="stat-grid" style={{ marginBottom: 12 }}>
+        <div className="stat">
+          <div className="value">{data.recitation}</div>
+          <div className="label">📖 Recitations</div>
+        </div>
+        <div className="stat">
+          <div className="value">{data.memorization}</div>
+          <div className="label">🧠 Memorizations</div>
+        </div>
+      </div>
+
+      <form onSubmit={submit}>
+        <div className="row">
+          <div className="field" style={{ flex: 1 }}>
+            <label>Type</label>
+            <select value={form.kind} onChange={(e) => setForm({ ...form, kind: e.target.value })}>
+              <option value="recitation">Recitation</option>
+              <option value="memorization">Memorization</option>
+            </select>
+          </div>
+          <div className="field" style={{ flex: 1 }}>
+            <label>Surah (optional)</label>
+            <input
+              type="text"
+              placeholder="e.g. Al-Kahf"
+              value={form.surah}
+              onChange={(e) => setForm({ ...form, surah: e.target.value })}
+            />
+          </div>
+        </div>
+        <div className="row">
+          <div className="field" style={{ flex: 1 }}>
+            <label>Juz (optional)</label>
+            <input
+              type="number"
+              min="1"
+              max="30"
+              value={form.juz}
+              onChange={(e) => setForm({ ...form, juz: e.target.value })}
+            />
+          </div>
+          <div className="field" style={{ flex: 1 }}>
+            <label>Pages (optional)</label>
+            <input
+              type="number"
+              min="1"
+              value={form.pages}
+              onChange={(e) => setForm({ ...form, pages: e.target.value })}
+            />
+          </div>
+        </div>
+        <div className="field">
+          <label>Note (optional)</label>
+          <input
+            type="text"
+            placeholder="Anything to remember"
+            value={form.note}
+            onChange={(e) => setForm({ ...form, note: e.target.value })}
+          />
+        </div>
+        <button className="btn btn-block" disabled={busy}>
+          {busy ? 'Saving…' : 'Log activity'}
+        </button>
+      </form>
+
+      {data.logs.length > 0 && (
+        <div style={{ marginTop: 16 }}>
+          {data.logs.slice(0, 10).map((log) => (
+            <div key={log.id} className="leader-row">
+              <div className="rank-badge" style={{ background: 'var(--teal-100)', color: 'var(--teal-900)' }}>
+                {log.kind === 'recitation' ? '📖' : '🧠'}
+              </div>
+              <div className="leader-name">
+                {log.kind === 'recitation' ? 'Recitation' : 'Memorization'}
+                <div className="muted" style={{ fontWeight: 400 }}>
+                  {[log.surah, log.juz ? `Juz ${log.juz}` : null, log.pages ? `${log.pages} pages` : null]
+                    .filter(Boolean)
+                    .join(' · ') || '—'}
+                  {' · '}
+                  {formatDate(log.logged_date)}
+                </div>
+              </div>
+              <button className="btn btn-sm btn-secondary" onClick={() => remove(log.id)}>
+                Delete
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function BadgesCard() {
+  const [leaders, setLeaders] = useState([]);
+  const { user } = useAuth();
+
+  useEffect(() => {
+    api
+      .leaderboard('all', 'overall')
+      .then((d) => setLeaders(d.leaderboard))
+      .catch(() => {});
+  }, []);
+
+  const me = leaders.find((r) => r.id === user?.id);
+
+  return (
+    <div className="card">
+      <h2 className="card-title">🎖️ Your badges</h2>
+      <p className="muted" style={{ marginBottom: 12 }}>
+        Earned from your all-time activity in each category.
+      </p>
+      {!me ? (
+        <p className="muted">No activity yet — start checking in and logging Quran activity.</p>
+      ) : (
+        CATEGORIES.filter((c) => c.key !== 'overall').map((c) => {
+          const score = me[c.key] ?? 0;
+          const badge = badgeFor(score);
+          return (
+            <div key={c.key} className="leader-row">
+              <div className="rank-badge" style={{ background: 'var(--slate-100)', color: 'var(--slate-800)' }}>
+                {c.icon}
+              </div>
+              <div className="leader-name">
+                {c.label}
+                <div className="muted" style={{ fontWeight: 400 }}>
+                  {score} {c.unit}
+                </div>
+              </div>
+              {badge ? (
+                <span className="badge">
+                  {badge.icon} {badge.label}
+                </span>
+              ) : (
+                <span className="pill warn">No badge yet</span>
+              )}
+            </div>
+          );
+        })
+      )}
+    </div>
+  );
+}
 
 function TelegramCard() {
   const { user, refreshUser } = useAuth();
@@ -117,7 +313,7 @@ export default function ProfilePage() {
             <strong style={{ fontSize: '1.1rem' }}>{user?.fullName}</strong>
             <div className="muted">{user?.phone}</div>
           </div>
-          <span className="pill">{user?.role === 'admin' ? 'Admin' : 'Member'}</span>
+          <span className="pill">{ROLE_LABELS[user?.role] || 'Member'}</span>
         </div>
         <div className="row" style={{ marginTop: 14, gap: 8 }}>
           <span className={`pill ${user?.hasFace ? '' : 'warn'}`}>
@@ -164,6 +360,10 @@ export default function ProfilePage() {
       </div>
 
       <TelegramCard />
+
+      <BadgesCard />
+
+      <QuranCard />
 
       <div className="card">
         <h2 className="card-title">🕌 {SURAU.name}</h2>

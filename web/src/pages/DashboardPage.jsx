@@ -6,21 +6,17 @@ import {
 } from 'recharts';
 import { api } from '../lib/api.js';
 import { useAuth } from '../lib/auth.jsx';
-import { PRAYERS, PRAYER_LABELS } from '../lib/constants.js';
-
-const RANGES = [
-  { label: 'All time', days: 0 },
-  { label: '7 days', days: 7 },
-  { label: '30 days', days: 30 },
-];
+import { PRAYERS, CATEGORIES, PERIODS, badgeFor } from '../lib/constants.js';
 
 export default function DashboardPage() {
   const { user } = useAuth();
   const [stats, setStats] = useState(null);
   const [leaders, setLeaders] = useState([]);
-  const [range, setRange] = useState(0);
+  const [period, setPeriod] = useState('month');
+  const [category, setCategory] = useState('overall');
   const [loading, setLoading] = useState(true);
   const [loginUrl, setLoginUrl] = useState('');
+  const [qrOpen, setQrOpen] = useState(false);
 
   useEffect(() => {
     // Auto-generate the login link from the current URL so the QR always
@@ -35,11 +31,13 @@ export default function DashboardPage() {
   useEffect(() => {
     setLoading(true);
     api
-      .leaderboard(range)
+      .leaderboard(period, category)
       .then((data) => setLeaders(data.leaderboard))
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, [range]);
+  }, [period, category]);
+
+  const activeCategory = CATEGORIES.find((c) => c.key === category) || CATEGORIES[0];
 
   const chartData = (stats?.last7Days || []).map((row) => ({
     date: new Date(row.attendance_date).toLocaleDateString(undefined, { weekday: 'short' }),
@@ -56,27 +54,74 @@ export default function DashboardPage() {
       <h1 className="page-title">Dashboard & ranking</h1>
       <p className="page-sub">Attendance statistics across the surau.</p>
 
-      <div className="card qr-card">
-        <div className="qr-box">
-          {loginUrl && (
-            <QRCodeSVG value={loginUrl} size={148} level="M" marginSize={1} />
-          )}
+      {/* ---- Leaderboard (top) ---- */}
+      <div className="card">
+        <div className="row-between" style={{ marginBottom: 12 }}>
+          <h2 className="card-title">🏆 Leaderboard</h2>
+          <span className="pill">
+            {activeCategory.icon} {activeCategory.label}
+          </span>
         </div>
-        <div className="qr-info">
-          <h2 className="card-title">📱 Scan to log in</h2>
-          <p className="muted" style={{ margin: '6px 0 12px' }}>
-            Point your phone camera at the code to open the login page and check in.
-          </p>
-          {user ? (
-            <Link className="btn btn-sm" to="/check-in">
-              Go to check-in
-            </Link>
-          ) : (
-            <Link className="btn btn-sm" to="/login">
-              Log in
-            </Link>
-          )}
+
+        <div className="tab-row">
+          {PERIODS.map((p) => (
+            <button
+              key={p.key}
+              className={`tab ${period === p.key ? 'active' : ''}`}
+              onClick={() => setPeriod(p.key)}
+            >
+              {p.label}
+            </button>
+          ))}
         </div>
+
+        <div className="tab-row" style={{ marginTop: 8 }}>
+          {CATEGORIES.map((c) => (
+            <button
+              key={c.key}
+              className={`tab ${category === c.key ? 'active' : ''}`}
+              onClick={() => setCategory(c.key)}
+            >
+              {c.icon} {c.label}
+            </button>
+          ))}
+        </div>
+
+        {loading ? (
+          <p className="muted">Loading…</p>
+        ) : leaders.length === 0 ? (
+          <p className="muted">No activity recorded yet.</p>
+        ) : (
+          leaders.map((row) => {
+            const medal = row.rank === 1 ? 'gold' : row.rank === 2 ? 'silver' : row.rank === 3 ? 'bronze' : '';
+            const isMe = row.id === user?.id;
+            const score = row[category] ?? 0;
+            const badge = badgeFor(score);
+            return (
+              <div key={row.id} className="leader-row">
+                <div className={`rank-badge ${medal}`}>{row.rank}</div>
+                <div className="leader-name">
+                  {row.full_name} {isMe && <span className="pill">You</span>}
+                  {badge && (
+                    <span className="badge" title={`${badge.label} tier`}>
+                      {badge.icon} {badge.label}
+                    </span>
+                  )}
+                  <div className="muted" style={{ fontWeight: 400 }}>
+                    {row.days_attended} days
+                    {row.guardian_name ? ` · child of ${row.guardian_name}` : ''}
+                  </div>
+                </div>
+                <div className="leader-score">
+                  {score}
+                  <div className="muted" style={{ fontWeight: 400, fontSize: '0.68rem' }}>
+                    {activeCategory.unit}
+                  </div>
+                </div>
+              </div>
+            );
+          })
+        )}
       </div>
 
       <div className="stat-grid">
@@ -87,6 +132,18 @@ export default function DashboardPage() {
         <div className="stat">
           <div className="value">{stats?.totalCheckIns ?? '–'}</div>
           <div className="label">Total check-ins</div>
+        </div>
+        <div className="stat">
+          <div className="value">{stats?.quran?.recitation ?? '–'}</div>
+          <div className="label">📖 Recitations</div>
+        </div>
+        <div className="stat">
+          <div className="value">{stats?.quran?.memorization ?? '–'}</div>
+          <div className="label">🧠 Memorizations</div>
+        </div>
+        <div className="stat">
+          <div className="value">{stats?.totalMerits ?? '–'}</div>
+          <div className="label">🏅 Merits awarded</div>
         </div>
       </div>
 
@@ -121,45 +178,41 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      <div className="card">
-        <div className="row-between" style={{ marginBottom: 12 }}>
-          <h2 className="card-title">🏆 Leaderboard</h2>
-        </div>
-        <div className="tab-row">
-          {RANGES.map((r) => (
-            <button
-              key={r.days}
-              className={`tab ${range === r.days ? 'active' : ''}`}
-              onClick={() => setRange(r.days)}
-            >
-              {r.label}
-            </button>
-          ))}
-        </div>
-
-        {loading ? (
-          <p className="muted">Loading…</p>
-        ) : leaders.length === 0 ? (
-          <p className="muted">No attendance recorded yet.</p>
-        ) : (
-          leaders.map((row) => {
-            const medal = row.rank === 1 ? 'gold' : row.rank === 2 ? 'silver' : row.rank === 3 ? 'bronze' : '';
-            const isMe = row.id === user?.id;
-            return (
-              <div key={row.id} className="leader-row">
-                <div className={`rank-badge ${medal}`}>{row.rank}</div>
-                <div className="leader-name">
-                  {row.full_name} {isMe && <span className="pill">You</span>}
-                  <div className="muted" style={{ fontWeight: 400 }}>
-                    {row.days_attended} days
-                    {row.guardian_name ? ` · child of ${row.guardian_name}` : ''}
-                  </div>
-                </div>
-                <div className="leader-score">{row.total}</div>
-              </div>
-            );
-          })
+      {/* ---- Floating login QR (bottom right) ---- */}
+      <div className={`qr-float ${qrOpen ? 'open' : ''}`}>
+        {qrOpen && (
+          <div className="qr-float-panel">
+            <div className="row-between" style={{ marginBottom: 8 }}>
+              <strong>📱 Scan to log in</strong>
+              <button className="qr-close" onClick={() => setQrOpen(false)} aria-label="Close">
+                ✕
+              </button>
+            </div>
+            <div className="qr-box">
+              {loginUrl && <QRCodeSVG value={loginUrl} size={148} level="M" marginSize={1} />}
+            </div>
+            <p className="muted" style={{ margin: '10px 0 0', textAlign: 'center' }}>
+              Point your phone camera here to open the login page.
+            </p>
+            {user ? (
+              <Link className="btn btn-sm btn-block" style={{ marginTop: 10 }} to="/check-in">
+                Go to check-in
+              </Link>
+            ) : (
+              <Link className="btn btn-sm btn-block" style={{ marginTop: 10 }} to="/login">
+                Log in
+              </Link>
+            )}
+          </div>
         )}
+        <button
+          className="qr-fab"
+          onClick={() => setQrOpen((v) => !v)}
+          aria-label="Show login QR code"
+          title="Scan to log in"
+        >
+          {qrOpen ? '✕' : '📱'}
+        </button>
       </div>
     </div>
   );

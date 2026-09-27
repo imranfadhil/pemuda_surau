@@ -1,10 +1,11 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { query } from '../db.js';
-import { requireAuth, requireAdmin } from '../middleware/auth.js';
+import { requireAuth, requireAdmin, requireCapability } from '../middleware/auth.js';
 import { asyncHandler, httpError } from '../middleware/errors.js';
 import { isValidDescriptor } from '../utils/face.js';
 import { generateOtp, hashOtp, otpExpiryDate } from '../utils/otp.js';
+import { ROLES } from '../utils/roles.js';
 import { publicUser } from './auth.js';
 
 const router = Router();
@@ -151,11 +152,11 @@ router.delete(
   }),
 );
 
-/** Admin: list all users. */
+/** Staff: list all users (teachers/AJK need this to pick a member). */
 router.get(
   '/',
   requireAuth,
-  requireAdmin,
+  requireCapability('viewMembers'),
   asyncHandler(async (req, res) => {
     const { rows } = await query(
       `SELECT u.*, g.full_name AS guardian_name
@@ -166,6 +167,33 @@ router.get(
     res.json({
       users: rows.map((row) => ({ ...publicUser(row), guardianName: row.guardian_name || null })),
     });
+  }),
+);
+
+/** Admin: change a member's role. */
+router.patch(
+  '/:id/role',
+  requireAuth,
+  requireAdmin,
+  asyncHandler(async (req, res) => {
+    const role = req.body?.role;
+    if (!ROLES.includes(role)) throw httpError(400, 'Invalid role');
+
+    const { rows: targetRows } = await query('SELECT * FROM users WHERE id = $1', [req.params.id]);
+    const target = targetRows[0];
+    if (!target) throw httpError(404, 'User not found');
+    if (target.guardian_id) throw httpError(400, 'Dependents inherit their guardian\'s role');
+
+    // Never let an admin demote themselves and lock everyone out.
+    if (target.id === req.user.sub && role !== 'admin') {
+      throw httpError(400, 'You cannot change your own admin role');
+    }
+
+    const { rows } = await query(
+      `UPDATE users SET role = $1, updated_at = now() WHERE id = $2 RETURNING *`,
+      [role, req.params.id],
+    );
+    res.json({ user: publicUser(rows[0]) });
   }),
 );
 

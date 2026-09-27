@@ -7,6 +7,18 @@ const router = Router();
 
 const PRAYERS = ['subuh', 'zuhur', 'asar', 'maghrib', 'isyak'];
 
+// Whitelisted leaderboard categories -> score column.
+const CATEGORY_COLUMNS = {
+  overall: 'overall',
+  attendance: 'attendance',
+  recitation: 'recitation',
+  memorization: 'memorization',
+  merits: 'merits',
+};
+
+// Whitelisted ranking periods.
+const PERIODS = ['month', 'year', 'all'];
+
 /**
  * Overall stats: totals, today's counts per prayer, and active member count.
  * Public: the dashboard is the app's landing page and is visible without login.
@@ -16,7 +28,7 @@ router.get(
   asyncHandler(async (req, res) => {
     const today = new Date().toISOString().slice(0, 10);
 
-    const [members, total, todayRows, weekRows] = await Promise.all([
+    const [members, total, todayRows, weekRows, meritRows, quranRows] = await Promise.all([
       query(`SELECT COUNT(*)::int AS count FROM users WHERE is_active = TRUE`),
       query(`SELECT COUNT(*)::int AS count FROM attendance`),
       query(
@@ -30,15 +42,22 @@ router.get(
          GROUP BY attendance_date ORDER BY attendance_date`,
         [today],
       ),
+      query(`SELECT COALESCE(SUM(points), 0)::int AS total FROM merits`),
+      query(`SELECT kind, COUNT(*)::int AS count FROM quran_logs GROUP BY kind`),
     ]);
 
     const todayByPrayer = Object.fromEntries(PRAYERS.map((p) => [p, 0]));
     for (const row of todayRows.rows) todayByPrayer[row.prayer] = row.count;
 
+    const quran = { recitation: 0, memorization: 0 };
+    for (const row of quranRows.rows) quran[row.kind] = row.count;
+
     res.json({
       today,
       activeMembers: members.rows[0].count,
       totalCheckIns: total.rows[0].count,
+      totalMerits: meritRows.rows[0].total,
+      quran,
       todayByPrayer,
       last7Days: weekRows.rows,
     });
@@ -46,38 +65,81 @@ router.get(
 );
 
 /**
- * Leaderboard / ranking. Ranks members by total check-ins, with a
- * configurable window (all-time by default).
+ * Leaderboard / ranking across categories.
+ *
+ * Query params:
+ *   period   = month | year | all   (default: all)
+ *   category = overall | attendance | recitation | memorization | merits
+ *              (default: overall)
+ *
  * Public: shown on the landing dashboard without login.
  */
 router.get(
   '/leaderboard',
   asyncHandler(async (req, res) => {
-    const days = Number(req.query.days || 0);
-    const params = [];
-    let dateFilter = '';
-    if (days > 0) {
-      params.push(days);
-      dateFilter = `AND a.attendance_date >= CURRENT_DATE - ($1::int - 1)`;
-    }
+    const period = PERIODS.includes(req.query.period) ? req.query.period : 'all';
+    const category = CATEGORY_COLUMNS[req.query.category] ? req.query.category : 'overall';
+    const orderColumn = CATEGORY_COLUMNS[category];
 
     const { rows } = await query(
-      `SELECT u.id, u.full_name, u.avatar_url, u.guardian_id,
+      `WITH period AS (
+         SELECT CASE
+           WHEN $1 = 'month' THEN date_trunc('month', CURRENT_DATE)::date
+           WHEN $1 = 'year'  THEN date_trunc('year', CURRENT_DATE)::date
+           ELSE NULL
+         END AS start_date
+       ),
+       att AS (
+         SELECT a.user_id,
+                COUNT(*)::int AS attendance,
+                COUNT(DISTINCT a.attendance_date)::int AS days_attended
+         FROM attendance a, period p
+         WHERE p.start_date IS NULL OR a.attendance_date >= p.start_date
+         GROUP BY a.user_id
+       ),
+       rec AS (
+         SELECT q.user_id, COUNT(*)::int AS recitation
+         FROM quran_logs q, period p
+         WHERE q.kind = 'recitation'
+           AND (p.start_date IS NULL OR q.logged_date >= p.start_date)
+         GROUP BY q.user_id
+       ),
+       mem AS (
+         SELECT q.user_id, COUNT(*)::int AS memorization
+         FROM quran_logs q, period p
+         WHERE q.kind = 'memorization'
+           AND (p.start_date IS NULL OR q.logged_date >= p.start_date)
+         GROUP BY q.user_id
+       ),
+       mer AS (
+         SELECT m.user_id, COALESCE(SUM(m.points), 0)::int AS merits
+         FROM merits m, period p
+         WHERE p.start_date IS NULL OR m.awarded_at >= p.start_date
+         GROUP BY m.user_id
+       )
+       SELECT u.id, u.full_name, u.avatar_url, u.guardian_id,
               g.full_name AS guardian_name,
-              COUNT(a.id)::int AS total,
-              COUNT(DISTINCT a.attendance_date)::int AS days_attended
+              COALESCE(att.attendance, 0) AS attendance,
+              COALESCE(att.days_attended, 0) AS days_attended,
+              COALESCE(rec.recitation, 0) AS recitation,
+              COALESCE(mem.memorization, 0) AS memorization,
+              COALESCE(mer.merits, 0) AS merits,
+              (COALESCE(att.attendance, 0) + COALESCE(rec.recitation, 0)
+               + COALESCE(mem.memorization, 0) + COALESCE(mer.merits, 0)) AS overall
        FROM users u
        LEFT JOIN users g ON g.id = u.guardian_id
-       LEFT JOIN attendance a ON a.user_id = u.id ${dateFilter}
+       LEFT JOIN att ON att.user_id = u.id
+       LEFT JOIN rec ON rec.user_id = u.id
+       LEFT JOIN mem ON mem.user_id = u.id
+       LEFT JOIN mer ON mer.user_id = u.id
        WHERE u.is_active = TRUE
-       GROUP BY u.id, g.full_name
-       ORDER BY total DESC, days_attended DESC, u.full_name ASC
+       ORDER BY ${orderColumn} DESC, attendance DESC, u.full_name ASC
        LIMIT 100`,
-      params,
+      [period],
     );
 
     const ranked = rows.map((row, index) => ({ rank: index + 1, ...row }));
-    res.json({ days, leaderboard: ranked });
+    res.json({ period, category, leaderboard: ranked });
   }),
 );
 
