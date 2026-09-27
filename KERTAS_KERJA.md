@@ -1,3 +1,4 @@
+
 # KERTAS KERJA
 
 ## CADANGAN PERLAKSANAAN SISTEM PEMUDA SURAU AL-ABQORI
@@ -280,27 +281,44 @@ Al-Abqori demi kebaikan bersama.
 
 Sekian, terima kasih.
 
----
 
 **Disediakan oleh:**
 
 _________________________
 Nama:
+
+
 Jawatan:
+
+
 Tarikh:
+
+
+
+
+
+
 
 **Disemak oleh:**
 
 _________________________
 Nama:
+
+
 Jawatan:
+
+
 Tarikh:
 
 **Diluluskan oleh:**
 
 _________________________
 Nama:
+
+
 Jawatan:
+
+
 Tarikh:
 
 ---

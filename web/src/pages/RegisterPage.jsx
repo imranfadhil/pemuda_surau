@@ -2,7 +2,10 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../lib/api.js';
 import { useAuth } from '../lib/auth.jsx';
-import { startCamera, stopCamera, captureDescriptor, loadModels } from '../lib/face.js';
+import {
+  startCamera, stopCamera, captureEnrollmentDescriptor, loadModels,
+} from '../lib/face.js';
+import { FaceTips, useFaceFeedback } from '../components/FaceTips.jsx';
 
 export default function RegisterPage() {
   const { user, refreshUser } = useAuth();
@@ -20,6 +23,9 @@ export default function RegisterPage() {
   const [busy, setBusy] = useState(false);
   const [cameraOn, setCameraOn] = useState(false);
   const [faceStatus, setFaceStatus] = useState('');
+
+  // Live framing/lighting feedback while the camera is open (paused during capture).
+  const feedback = useFaceFeedback(videoRef, cameraOn, { enabled: !busy });
 
   useEffect(() => () => stopCamera(streamRef.current), []);
 
@@ -60,22 +66,33 @@ export default function RegisterPage() {
 
   async function enrollFace() {
     setError('');
-    setFaceStatus('Scanning…');
+    setFaceStatus('Starting — hold still…');
+    setBusy(true);
     try {
-      const result = await captureDescriptor(videoRef.current);
+      // Average several frames for a more stable descriptor than a single shot.
+      const result = await captureEnrollmentDescriptor(videoRef.current, {
+        shots: 5,
+        onProgress: (done, total) => setFaceStatus(`Hold still… ${done + 1} of ${total}`),
+      });
       if (!result) {
-        setFaceStatus('No face detected. Make sure your face is well lit and centered.');
+        setFaceStatus('No face detected. Improve the lighting and centre your face, then try again.');
         return;
       }
       await api.enrollFace(result.descriptor);
       await refreshUser();
       stopCamera(streamRef.current);
       setCameraOn(false);
-      setFaceStatus('Face enrolled successfully!');
-      setTimeout(() => navigate('/home', { replace: true }), 900);
+      setFaceStatus(
+        result.clean >= 2
+          ? 'Face enrolled successfully!'
+          : 'Face enrolled — but the scan quality was low. Consider re-enrolling in better light.',
+      );
+      if (result.clean >= 2) setTimeout(() => navigate('/home', { replace: true }), 900);
     } catch (err) {
       setError(err.message);
       setFaceStatus('');
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -144,33 +161,40 @@ export default function RegisterPage() {
 
           {faceStatus && <div className="alert alert-info">{faceStatus}</div>}
 
-          <div className="camera-wrap">
-            <video ref={videoRef} className="camera-mirror" playsInline muted />
-            {cameraOn && <div className="camera-overlay" />}
-            {cameraOn && <div className="camera-hint">Center your face in the frame</div>}
-          </div>
+          <div className="face-enroll-grid">
+            <div>
+              <div className="camera-wrap">
+                <video ref={videoRef} className="camera-mirror" playsInline muted />
+                {cameraOn && <div className="camera-overlay" />}
+                {cameraOn && <div className="camera-hint">{feedback || 'Center your face in the frame'}</div>}
+              </div>
 
-          <div className="row" style={{ marginTop: 14 }}>
-            {!cameraOn ? (
-              <button className="btn btn-block" onClick={enableCamera}>
-                Open camera
-              </button>
-            ) : (
-              <>
-                <button className="btn" style={{ flex: 1 }} onClick={enrollFace}>
-                  Capture & enroll
-                </button>
-                <button
-                  className="btn btn-secondary"
-                  onClick={() => {
-                    stopCamera(streamRef.current);
-                    setCameraOn(false);
-                  }}
-                >
-                  Cancel
-                </button>
-              </>
-            )}
+              <div className="row" style={{ marginTop: 14 }}>
+                {!cameraOn ? (
+                  <button className="btn btn-block" onClick={enableCamera} disabled={busy}>
+                    Open camera
+                  </button>
+                ) : (
+                  <>
+                    <button className="btn" style={{ flex: 1 }} onClick={enrollFace} disabled={busy}>
+                      {busy ? 'Scanning…' : 'Capture & enroll'}
+                    </button>
+                    <button
+                      className="btn btn-secondary"
+                      disabled={busy}
+                      onClick={() => {
+                        stopCamera(streamRef.current);
+                        setCameraOn(false);
+                      }}
+                    >
+                      Cancel
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+
+            <FaceTips />
           </div>
         </div>
       </main>

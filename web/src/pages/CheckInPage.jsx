@@ -1,8 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../lib/api.js';
-import { startCamera, stopCamera, captureDescriptor, loadModels } from '../lib/face.js';
+import {
+  startCamera, stopCamera, captureDescriptor, loadModels, qualityMessage,
+} from '../lib/face.js';
 import { getPosition } from '../lib/geo.js';
+import { FaceTips, useFaceFeedback } from '../components/FaceTips.jsx';
 import { PRAYERS, PRAYER_LABELS } from '../lib/constants.js';
 
 function formatClock(iso) {
@@ -33,6 +36,9 @@ export default function CheckInPage() {
   const [selectedId, setSelectedId] = useState(null);
   const [win, setWin] = useState(null);
   const [now, setNow] = useState(Date.now());
+
+  // Live framing/lighting feedback while the camera is open (paused during capture).
+  const feedback = useFaceFeedback(videoRef, cameraOn, { enabled: !busy });
 
   function loadWindow() {
     api
@@ -97,7 +103,12 @@ export default function CheckInPage() {
     try {
       const captured = await captureDescriptor(videoRef.current);
       if (!captured) {
-        setStatus('No face detected. Move closer and improve lighting.');
+        setStatus(qualityMessage(['no-face']));
+        return;
+      }
+      // Refuse an obviously poor frame so we don't waste a match on bad data.
+      if (captured.issues.length > 0) {
+        setStatus(qualityMessage(captured.issues));
         return;
       }
       // The device must be at the surau; the server enforces the geofence.
@@ -203,46 +214,52 @@ export default function CheckInPage() {
           </div>
         )}
 
-        <div className="camera-wrap">
-          <video
-            ref={videoRef}
-            className={selected?.isDependent ? undefined : 'camera-mirror'}
-            playsInline
-            muted
-          />
-          {cameraOn && <div className="camera-overlay" />}
-        </div>
+        <div className="face-enroll-grid">
+          <div>
+            <div className="camera-wrap">
+              <video
+                ref={videoRef}
+                className={selected?.isDependent ? undefined : 'camera-mirror'}
+                playsInline
+                muted
+              />
+              {cameraOn && <div className="camera-overlay" />}
+              {cameraOn && <div className="camera-hint">{feedback || 'Center the face in the frame'}</div>}
+            </div>
 
-        <div className="row" style={{ marginTop: 14 }}>
-          {!cameraOn ? (
-            <button
-              className="btn btn-block"
-              disabled={!current || alreadyDone || !selected?.hasFace}
-              onClick={enableCamera}
-            >
-              {alreadyDone
-                ? `Already checked in for ${PRAYER_LABELS[activePrayer]}`
-                : current
-                  ? `Open camera for ${PRAYER_LABELS[activePrayer]}`
-                  : 'Check-in closed'}
-            </button>
-          ) : (
-            <>
-              <button className="btn" style={{ flex: 1 }} disabled={busy} onClick={verify}>
-                {busy ? 'Verifying…' : `Verify & check in for ${PRAYER_LABELS[activePrayer]}`}
-              </button>
-              <button
-                className="btn btn-secondary"
-                onClick={() => {
-                  stopCamera(streamRef.current);
-                  setCameraOn(false);
-                  setStatus('');
-                }}
-              >
-                Stop
-              </button>
-            </>
-          )}
+            <div className="row" style={{ marginTop: 14 }}>
+              {!cameraOn ? (
+                <button
+                  className="btn btn-block"
+                  disabled={!current || alreadyDone || !selected?.hasFace}
+                  onClick={enableCamera}
+                >
+                  {alreadyDone
+                    ? `Already checked in for ${PRAYER_LABELS[activePrayer]}`
+                    : current
+                      ? `Open camera for ${PRAYER_LABELS[activePrayer]}`
+                      : 'Check-in closed'}
+                </button>
+              ) : (
+                <>
+                  <button className="btn" style={{ flex: 1 }} disabled={busy} onClick={verify}>
+                    {busy ? 'Verifying…' : `Verify & check in for ${PRAYER_LABELS[activePrayer]}`}
+                  </button>
+                  <button
+                    className="btn btn-secondary"
+                    onClick={() => {
+                      stopCamera(streamRef.current);
+                      setCameraOn(false);
+                      setStatus('');
+                    }}
+                  >
+                    Stop
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+          <FaceTips compact title="Check-in tips" />
         </div>
       </div>
 

@@ -1,7 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { api } from '../lib/api.js';
-import { startCamera, stopCamera, captureDescriptor, loadModels } from '../lib/face.js';
+import {
+  startCamera, stopCamera, captureDescriptor, loadModels, qualityMessage,
+} from '../lib/face.js';
 import { getPosition } from '../lib/geo.js';
+import { FaceTips, useFaceFeedback } from './FaceTips.jsx';
 
 /**
  * Staff face-scan flow: scan a youth's face at the surau, get a *suggested*
@@ -21,6 +24,9 @@ export default function FaceScan({ onConfirmed, onCancel }) {
   const [busy, setBusy] = useState(false);
   const [suggestion, setSuggestion] = useState(null);
   const [captured, setCaptured] = useState(null);
+
+  // Live framing/lighting feedback while the camera is open (paused during capture).
+  const feedback = useFaceFeedback(videoRef, cameraOn, { enabled: !busy });
 
   useEffect(
     () => () => {
@@ -52,7 +58,12 @@ export default function FaceScan({ onConfirmed, onCancel }) {
     try {
       const shot = await captureDescriptor(videoRef.current);
       if (!shot) {
-        setStatus('No face detected. Move closer and improve lighting.');
+        setStatus(qualityMessage(['no-face']));
+        return;
+      }
+      // Refuse an obviously poor frame so we don't waste a match on bad data.
+      if (shot.issues.length > 0) {
+        setStatus(qualityMessage(shot.issues));
         return;
       }
 
@@ -106,23 +117,27 @@ export default function FaceScan({ onConfirmed, onCancel }) {
       {status && <div className="alert alert-info">{status}</div>}
 
       {!suggestion && (
-        <>
-          <div className="camera-wrap">
-            <video ref={videoRef} playsInline muted />
-            {cameraOn && <div className="camera-overlay" />}
+        <div className="face-enroll-grid">
+          <div>
+            <div className="camera-wrap">
+              <video ref={videoRef} playsInline muted />
+              {cameraOn && <div className="camera-overlay" />}
+              {cameraOn && <div className="camera-hint">{feedback || 'Center the face in the frame'}</div>}
+            </div>
+            <div className="row" style={{ marginTop: 14 }}>
+              {!cameraOn ? (
+                <button className="btn btn-block" onClick={enableCamera} disabled={busy}>
+                  Open camera
+                </button>
+              ) : (
+                <button className="btn btn-block" onClick={scan} disabled={busy}>
+                  {busy ? 'Scanning…' : 'Scan face'}
+                </button>
+              )}
+            </div>
           </div>
-          <div className="row" style={{ marginTop: 14 }}>
-            {!cameraOn ? (
-              <button className="btn btn-block" onClick={enableCamera} disabled={busy}>
-                Open camera
-              </button>
-            ) : (
-              <button className="btn btn-block" onClick={scan} disabled={busy}>
-                {busy ? 'Scanning…' : 'Scan face'}
-              </button>
-            )}
-          </div>
-        </>
+          <FaceTips compact title="Scan tips" />
+        </div>
       )}
 
       {suggestion && (

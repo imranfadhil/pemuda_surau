@@ -1,7 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../lib/api.js';
-import { startCamera, stopCamera, captureDescriptor, loadModels } from '../lib/face.js';
+import {
+  startCamera, stopCamera, captureEnrollmentDescriptor, loadModels,
+} from '../lib/face.js';
+import { FaceTips, useFaceFeedback } from '../components/FaceTips.jsx';
 import { ageLabel } from '../lib/age.js';
 
 const emptyForm = { fullName: '', birthDate: '', gender: 'male' };
@@ -21,6 +24,10 @@ export default function DependentPage() {
   const [enrolling, setEnrolling] = useState(null);
   const [cameraOn, setCameraOn] = useState(false);
   const [faceStatus, setFaceStatus] = useState('');
+  const [faceBusy, setFaceBusy] = useState(false);
+
+  // Live framing/lighting feedback while the camera is open (paused during capture).
+  const feedback = useFaceFeedback(videoRef, cameraOn, { enabled: !faceBusy });
 
   function load() {
     setLoading(true);
@@ -113,22 +120,33 @@ export default function DependentPage() {
 
   async function capture() {
     setError('');
-    setFaceStatus('Scanning…');
+    setFaceStatus('Starting — hold still…');
+    setFaceBusy(true);
     try {
-      const result = await captureDescriptor(videoRef.current);
+      // Average several frames for a more stable descriptor than a single shot.
+      const result = await captureEnrollmentDescriptor(videoRef.current, {
+        shots: 5,
+        onProgress: (done, total) => setFaceStatus(`Hold still… ${done + 1} of ${total}`),
+      });
       if (!result) {
-        setFaceStatus('No face detected. Make sure the face is well lit and centered.');
+        setFaceStatus('No face detected. Improve the lighting and centre the face, then try again.');
         return;
       }
       await api.enrollDependentFace(enrolling.id, result.descriptor);
       stopCamera(streamRef.current);
       setCameraOn(false);
-      setFaceStatus(`${enrolling.fullName}'s face enrolled successfully!`);
+      setFaceStatus(
+        result.clean >= 2
+          ? `${enrolling.fullName}'s face enrolled successfully!`
+          : `${enrolling.fullName}'s face enrolled, but the scan quality was low. Consider re-enrolling in better light.`,
+      );
       setEnrolling(null);
       load();
     } catch (err) {
       setError(err.message);
       setFaceStatus('');
+    } finally {
+      setFaceBusy(false);
     }
   }
 
@@ -239,18 +257,23 @@ export default function DependentPage() {
             We store a mathematical face descriptor — not a photo.
           </p>
           {faceStatus && <div className="alert alert-info">{faceStatus}</div>}
-          <div className="camera-wrap">
-            <video ref={videoRef} playsInline muted />
-            {cameraOn && <div className="camera-overlay" />}
-            {cameraOn && <div className="camera-hint">Center the face in the frame</div>}
-          </div>
-          <div className="row" style={{ marginTop: 14 }}>
-            <button className="btn" style={{ flex: 1 }} onClick={capture} disabled={!cameraOn}>
-              Capture & enroll
-            </button>
-            <button className="btn btn-secondary" onClick={stopEnroll}>
-              Cancel
-            </button>
+          <div className="face-enroll-grid">
+            <div>
+              <div className="camera-wrap">
+                <video ref={videoRef} playsInline muted />
+                {cameraOn && <div className="camera-overlay" />}
+                {cameraOn && <div className="camera-hint">{feedback || 'Center the face in the frame'}</div>}
+              </div>
+              <div className="row" style={{ marginTop: 14 }}>
+                <button className="btn" style={{ flex: 1 }} onClick={capture} disabled={!cameraOn || faceBusy}>
+                  {faceBusy ? 'Scanning…' : 'Capture & enroll'}
+                </button>
+                <button className="btn btn-secondary" onClick={stopEnroll} disabled={faceBusy}>
+                  Cancel
+                </button>
+              </div>
+            </div>
+            <FaceTips />
           </div>
         </div>
       )}
