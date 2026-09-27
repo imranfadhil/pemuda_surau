@@ -65,6 +65,85 @@ router.get(
 );
 
 /**
+ * Weekly activity breakdown: per-day totals for prayer attendance (split by
+ * prayer), Quran recitation, Quran memorization, and merits over the last
+ * 7 days. Public: shown on the kiosk wall display.
+ */
+router.get(
+  '/weekly',
+  asyncHandler(async (req, res) => {
+    const { rows } = await query(
+      `WITH days AS (
+         SELECT generate_series(CURRENT_DATE - INTERVAL '6 days', CURRENT_DATE, '1 day')::date AS day
+       ),
+       att AS (
+         SELECT attendance_date AS day,
+                COUNT(*) FILTER (WHERE prayer = 'subuh')::int   AS subuh,
+                COUNT(*) FILTER (WHERE prayer = 'zuhur')::int   AS zuhur,
+                COUNT(*) FILTER (WHERE prayer = 'asar')::int    AS asar,
+                COUNT(*) FILTER (WHERE prayer = 'maghrib')::int AS maghrib,
+                COUNT(*) FILTER (WHERE prayer = 'isyak')::int   AS isyak,
+                COUNT(*)::int AS attendance
+         FROM attendance
+         WHERE attendance_date >= CURRENT_DATE - INTERVAL '6 days'
+         GROUP BY attendance_date
+       ),
+       rec AS (
+         SELECT logged_date AS day, COUNT(*)::int AS recitation
+         FROM quran_logs
+         WHERE kind = 'recitation' AND logged_date >= CURRENT_DATE - INTERVAL '6 days'
+         GROUP BY logged_date
+       ),
+       mem AS (
+         SELECT logged_date AS day, COUNT(*)::int AS memorization
+         FROM quran_logs
+         WHERE kind = 'memorization' AND logged_date >= CURRENT_DATE - INTERVAL '6 days'
+         GROUP BY logged_date
+       ),
+       mer AS (
+         SELECT awarded_at::date AS day, COALESCE(SUM(points), 0)::int AS merits
+         FROM merits
+         WHERE awarded_at >= CURRENT_DATE - INTERVAL '6 days'
+         GROUP BY awarded_at::date
+       )
+       SELECT d.day,
+              COALESCE(att.subuh, 0)        AS subuh,
+              COALESCE(att.zuhur, 0)        AS zuhur,
+              COALESCE(att.asar, 0)         AS asar,
+              COALESCE(att.maghrib, 0)      AS maghrib,
+              COALESCE(att.isyak, 0)        AS isyak,
+              COALESCE(att.attendance, 0)   AS attendance,
+              COALESCE(rec.recitation, 0)   AS recitation,
+              COALESCE(mem.memorization, 0) AS memorization,
+              COALESCE(mer.merits, 0)       AS merits
+       FROM days d
+       LEFT JOIN att ON att.day = d.day
+       LEFT JOIN rec ON rec.day = d.day
+       LEFT JOIN mem ON mem.day = d.day
+       LEFT JOIN mer ON mer.day = d.day
+       ORDER BY d.day`,
+    );
+
+    res.json({
+      days: rows.map((row) => ({
+        date: row.day,
+        attendance: row.attendance,
+        prayers: {
+          subuh: row.subuh,
+          zuhur: row.zuhur,
+          asar: row.asar,
+          maghrib: row.maghrib,
+          isyak: row.isyak,
+        },
+        recitation: row.recitation,
+        memorization: row.memorization,
+        merits: row.merits,
+      })),
+    });
+  }),
+);
+
+/**
  * Leaderboard / ranking across categories.
  *
  * Query params:

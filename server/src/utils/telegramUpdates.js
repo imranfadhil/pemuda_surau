@@ -47,7 +47,7 @@ export async function handleTelegramUpdate(update) {
 async function promptPhoneShare(chatId) {
   await sendTelegramMessage(
     chatId,
-    'Welcome to Surau Al-Abqori! 👋\n\n' +
+    'Welcome to Pemuda Surau Al-Abqori! 👋\n\n' +
       'Tap the button below to share your phone number. We use it to find your ' +
       'account and send your login code here.',
     {
@@ -171,7 +171,7 @@ async function handleLinkToken(chatId, username, token) {
 
   await sendTelegramMessage(
     chatId,
-    '✅ Linked! You will now receive your Surau Al-Abqori login codes here.',
+    '✅ Linked! You will now receive your Pemuda Surau Al-Abqori login codes here.',
   );
 }
 

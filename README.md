@@ -1,4 +1,4 @@
-# Surau Al-Abqori — Youth Prayer Attendance Tracker
+# Pemuda Surau Al-Abqori — Prayer, Quran & Good Deeds Tracker
 
 Aplikasi untuk program orang muda surau — track youth attendance at the 5 daily prayers
 with phone-based face verification.

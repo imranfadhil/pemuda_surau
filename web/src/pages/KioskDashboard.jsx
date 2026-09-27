@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import {
-  BarChart, Bar, XAxis, YAxis, ResponsiveContainer, CartesianGrid,
+  BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, CartesianGrid,
 } from 'recharts';
 import { api } from '../lib/api.js';
-import { PRAYERS, CATEGORIES, badgeFor, SURAU } from '../lib/constants.js';
+import { CATEGORIES, badgeFor, SURAU } from '../lib/constants.js';
 
 // How long each leaderboard category stays on screen before rotating.
 const ROTATE_MS = 12000;
@@ -58,6 +58,7 @@ function LeaderColumn({ title, rows, category }) {
 export default function KioskDashboard() {
   const now = useClock();
   const [stats, setStats] = useState(null);
+  const [weekly, setWeekly] = useState([]);
   const [monthly, setMonthly] = useState([]);
   const [yearly, setYearly] = useState([]);
   const [catIndex, setCatIndex] = useState(0);
@@ -74,6 +75,14 @@ export default function KioskDashboard() {
   // Overall stats, refreshed periodically.
   useEffect(() => {
     const load = () => api.stats().then(setStats).catch(() => {});
+    load();
+    const t = setInterval(load, REFRESH_MS);
+    return () => clearInterval(t);
+  }, []);
+
+  // Weekly activity breakdown (attendance, Quran, merits), refreshed periodically.
+  useEffect(() => {
+    const load = () => api.weekly().then((d) => setWeekly(d.days)).catch(() => {});
     load();
     const t = setInterval(load, REFRESH_MS);
     return () => clearInterval(t);
@@ -104,10 +113,30 @@ export default function KioskDashboard() {
     return () => clearInterval(t);
   }, []);
 
-  const todayChart = PRAYERS.map((p) => ({
-    name: p.label,
-    count: stats?.todayByPrayer?.[p.key] || 0,
-  }));
+  // Normalise each category against its own weekly peak, so every category is
+  // visible and comparable across the week (a single global max would make the
+  // smaller categories invisible next to attendance). The attendance bar is
+  // stacked by prayer; its segments sum to that day's attendance share.
+  const weeklyChart = (() => {
+    if (weekly.length === 0) return [];
+    const maxOf = (fn) => Math.max(1, ...weekly.map(fn));
+    const maxAtt = maxOf((r) => r.attendance);
+    const maxRec = maxOf((r) => r.recitation);
+    const maxMem = maxOf((r) => r.memorization);
+    const maxMer = maxOf((r) => r.merits);
+    const pct = (v, max) => Number(((v / max) * 100).toFixed(1));
+    return weekly.map((row) => ({
+      day: new Date(row.date).toLocaleDateString(undefined, { weekday: 'short' }),
+      subuh: pct(row.prayers?.subuh || 0, maxAtt),
+      zuhur: pct(row.prayers?.zuhur || 0, maxAtt),
+      asar: pct(row.prayers?.asar || 0, maxAtt),
+      maghrib: pct(row.prayers?.maghrib || 0, maxAtt),
+      isyak: pct(row.prayers?.isyak || 0, maxAtt),
+      recitation: pct(row.recitation, maxRec),
+      memorization: pct(row.memorization, maxMem),
+      merits: pct(row.merits, maxMer),
+    }));
+  })();
 
   const dateStr = now.toLocaleDateString(undefined, {
     weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
@@ -120,7 +149,7 @@ export default function KioskDashboard() {
         <div className="kiosk-brand">
           <span className="brand-logo">🕌</span>
           <div>
-            <div className="kiosk-title">{SURAU.name}</div>
+            <div className="kiosk-title">Pemuda {SURAU.name}</div>
             <div className="kiosk-sub">Prayer · Quran · Good Deeds</div>
           </div>
         </div>
@@ -153,14 +182,34 @@ export default function KioskDashboard() {
           </div>
 
           <div className="card kiosk-chart">
-            <h2 className="card-title">Today by prayer</h2>
+            <div className="row-between">
+              <h2 className="card-title">Weekly activity</h2>
+              <span className="muted">Last 7 days · % of each category's weekly peak</span>
+            </div>
             <div className="kiosk-chart-body">
               <ResponsiveContainer>
-                <BarChart data={todayChart}>
+                <BarChart data={weeklyChart} barGap={2} barCategoryGap="22%">
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                  <XAxis dataKey="name" tick={{ fontSize: 14 }} />
-                  <YAxis allowDecimals={false} tick={{ fontSize: 14 }} />
-                  <Bar dataKey="count" fill="#0d9488" radius={[6, 6, 0, 0]} />
+                  <XAxis dataKey="day" tick={{ fontSize: 13 }} />
+                  <YAxis
+                    allowDecimals={false}
+                    tick={{ fontSize: 12 }}
+                    domain={[0, 100]}
+                    ticks={[0, 25, 50, 75, 100]}
+                    tickFormatter={(v) => `${v}%`}
+                  />
+                  <Tooltip formatter={(v) => `${v}%`} />
+                  <Legend wrapperStyle={{ fontSize: 12 }} />
+                  {/* Attendance, stacked by prayer (distinct, readable colours). */}
+                  <Bar dataKey="subuh" name="Subuh" stackId="att" fill="#0f766e" />
+                  <Bar dataKey="zuhur" name="Zuhur" stackId="att" fill="#0d9488" />
+                  <Bar dataKey="asar" name="Asar" stackId="att" fill="#14b8a6" />
+                  <Bar dataKey="maghrib" name="Maghrib" stackId="att" fill="#2dd4bf" />
+                  <Bar dataKey="isyak" name="Isyak" stackId="att" fill="#5eead4" radius={[4, 4, 0, 0]} />
+                  {/* Other categories, normalised to their own weekly peak. */}
+                  <Bar dataKey="recitation" name="📖 Recitation" fill="#f59e0b" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="memorization" name="🧠 Memorization" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="merits" name="🏅 Merits" fill="#ef4444" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
