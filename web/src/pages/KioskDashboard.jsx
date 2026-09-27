@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { QRCodeSVG } from 'qrcode.react';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, CartesianGrid,
 } from 'recharts';
 import { api } from '../lib/api.js';
 import { CATEGORIES, badgeFor, SURAU } from '../lib/constants.js';
+import { useIsMobile } from '../lib/device.js';
 
 // How long each leaderboard category stays on screen before rotating.
 const ROTATE_MS = 12000;
@@ -50,12 +52,150 @@ function LeaderColumn({ title, rows, category }) {
 }
 
 /**
+ * Shown instead of the wall display on phones / small screens, where the
+ * non-scrolling kiosk layout is unusable. On the public landing page (`/`) we
+ * render the mobile-friendly viewer dashboard; on `/display` we nudge them to
+ * log in.
+ */
+function MobileNotice() {
+  return (
+    <div className="kiosk-mobile">
+      <img className="brand-logo" src="/logo.png" alt="" />
+      <h1 className="kiosk-title" style={{ fontSize: '1.4rem' }}>
+        Pemuda {SURAU.name}
+      </h1>
+      <p className="kiosk-sub" style={{ marginBottom: 24 }}>
+        The wall display is meant for a large landscape screen.
+      </p>
+      <div className="card" style={{ textAlign: 'center', maxWidth: 360 }}>
+        <p style={{ marginTop: 0 }}>
+          Log in to check in for prayers and track your progress.
+        </p>
+        <Link
+          className="btn btn-block"
+          style={{ display: 'block', textAlign: 'center' }}
+          to="/login"
+        >
+          Log in
+        </Link>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Mobile-friendly version of the public landing view. Same read-only data as the
+ * wall display (no login QR, no rotation), but laid out as a normal scrolling
+ * page so it works on a phone.
+ */
+function MobileDashboard({ stats, weeklyChart, monthly, yearly, category, catIndex, onSelectCat }) {
+  const dateStr = new Date().toLocaleDateString(undefined, {
+    weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
+  });
+
+  return (
+    <div className="mobile-dashboard">
+      <header className="mobile-dash-head">
+        <img className="brand-logo" src="/logo.png" alt="" />
+        <div>
+          <div className="mobile-dash-title">Pemuda {SURAU.name}</div>
+          <div className="mobile-dash-sub">{dateStr}</div>
+        </div>
+      </header>
+
+      <div className="stat-grid">
+        <div className="stat">
+          <div className="value">{stats?.activeMembers ?? '–'}</div>
+          <div className="label">Members</div>
+        </div>
+        <div className="stat">
+          <div className="value">{stats?.totalCheckIns ?? '–'}</div>
+          <div className="label">🕌 Check-ins</div>
+        </div>
+        <div className="stat">
+          <div className="value">{stats?.quran?.recitation ?? '–'}</div>
+          <div className="label">📖 Recitations</div>
+        </div>
+        <div className="stat">
+          <div className="value">{stats?.quran?.memorization ?? '–'}</div>
+          <div className="label">🧠 Memorizations</div>
+        </div>
+        <div className="stat">
+          <div className="value">{stats?.totalMerits ?? '–'}</div>
+          <div className="label">🏅 Merits</div>
+        </div>
+      </div>
+
+      <div className="card">
+        <h2 className="card-title">🏆 Leaderboard</h2>
+        <div className="category-pills">
+          {CATEGORIES.map((c, i) => (
+            <button
+              key={c.key}
+              type="button"
+              className={`pill ${i === catIndex ? 'active' : ''}`}
+              onClick={() => onSelectCat(i)}
+            >
+              {c.icon} {c.label}
+            </button>
+          ))}
+        </div>
+        <div className="mobile-leader-grid">
+          <LeaderColumn title="This month" rows={monthly} category={category} />
+          <LeaderColumn title="This year" rows={yearly} category={category} />
+        </div>
+      </div>
+
+      <div className="card">
+        <div className="row-between" style={{ marginBottom: 8 }}>
+          <h2 className="card-title">Weekly activity</h2>
+        </div>
+        <div style={{ width: '100%', height: 240 }}>
+          <ResponsiveContainer>
+            <BarChart data={weeklyChart} barGap={2} barCategoryGap="22%">
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+              <XAxis dataKey="day" tick={{ fontSize: 12 }} />
+              <YAxis
+                allowDecimals={false}
+                tick={{ fontSize: 12 }}
+                domain={[0, 100]}
+                ticks={[0, 25, 50, 75, 100]}
+                tickFormatter={(v) => `${v}%`}
+              />
+              <Tooltip formatter={(v) => `${v}%`} />
+              <Legend wrapperStyle={{ fontSize: '0.75rem' }} />
+              <Bar dataKey="subuh" name="Subuh" stackId="att" fill="#0f766e" />
+              <Bar dataKey="zuhur" name="Zuhur" stackId="att" fill="#0d9488" />
+              <Bar dataKey="asar" name="Asar" stackId="att" fill="#14b8a6" />
+              <Bar dataKey="maghrib" name="Maghrib" stackId="att" fill="#2dd4bf" />
+              <Bar dataKey="isyak" name="Isyak" stackId="att" fill="#5eead4" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="recitation" name="📖 Recitation" fill="#f59e0b" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="memorization" name="🧠 Memorization" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="merits" name="🏅 Merits" fill="#ef4444" radius={[4, 4, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
+      <p className="center muted" style={{ marginTop: 16 }}>
+        <Link to="/login">Log in</Link> to check in and track your own progress.
+      </p>
+    </div>
+  );
+}
+
+/**
  * Full-screen, non-scrolling dashboard for the surau's wall monitor.
  * Shown on the public landing page (and at /display). No interaction is
  * required: the leaderboard category rotates automatically and the login QR
  * is always visible.
+ *
+ * On phones the wall layout is unusable, so on the public landing page we render
+ * the mobile-friendly {@link MobileDashboard}, and at `/display` we show
+ * {@link MobileNotice}.
  */
-export default function KioskDashboard() {
+export default function KioskDashboard({ publicHome = false }) {
+  const isMobile = useIsMobile();
   const now = useClock();
   const [stats, setStats] = useState(null);
   const [weekly, setWeekly] = useState([]);
@@ -142,6 +282,22 @@ export default function KioskDashboard() {
     weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
   });
   const timeStr = now.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+
+  // Small screens can't render the non-scrolling wall layout usefully.
+  if (isMobile) {
+    if (!publicHome) return <MobileNotice />;
+    return (
+      <MobileDashboard
+        stats={stats}
+        weeklyChart={weeklyChart}
+        monthly={monthly}
+        yearly={yearly}
+        category={category}
+        catIndex={catIndex}
+        onSelectCat={setCatIndex}
+      />
+    );
+  }
 
   return (
     <div className="kiosk">

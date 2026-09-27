@@ -197,7 +197,7 @@ export default function App() {
           ) : (
             /* Logged out: the landing page is the non-scrolling wall display. */
             <Routes>
-              <Route path="/" element={<KioskDashboard />} />
+              <Route path="/" element={<KioskDashboard publicHome />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           )
