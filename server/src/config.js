@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import { canonicalPhone } from './utils/phone.js';
 
 function required(name, fallback) {
   const value = process.env[name] ?? fallback;
@@ -52,7 +53,7 @@ export const config = {
   publicUrl: process.env.PUBLIC_URL || '',
   adminPhones: (process.env.ADMIN_PHONES || '')
     .split(',')
-    .map((p) => p.trim())
+    .map((p) => canonicalPhone(p.trim()))
     .filter(Boolean),
   corsOrigin: process.env.CORS_ORIGIN || '*',
 };

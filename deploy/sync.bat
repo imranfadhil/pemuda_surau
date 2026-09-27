@@ -52,7 +52,7 @@ set "SSH_OPTS=-o StrictHostKeyChecking=accept-new -o ConnectTimeout=15 -o Server
 REM Transient network blips between here and the droplet are common, so every
 REM SSH call is retried a few times (see :ssh_run / :ssh_pipe) before the sync
 REM is considered failed.
-set SSH_RETRIES=4
+set SSH_RETRIES=5
 
 REM -- Package code (exclude node_modules, .git, build output) --------
 echo [1/5] Packaging project...

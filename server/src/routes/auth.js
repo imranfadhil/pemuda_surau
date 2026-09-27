@@ -4,7 +4,7 @@ import { query } from '../db.js';
 import { config } from '../config.js';
 import { signToken, requireAuth } from '../middleware/auth.js';
 import { asyncHandler, httpError } from '../middleware/errors.js';
-import { generateOtp, hashOtp, verifyOtp, otpExpiryDate, normalizePhone } from '../utils/otp.js';
+import { generateOtp, hashOtp, verifyOtp, otpExpiryDate, canonicalPhone, phoneVariants } from '../utils/otp.js';
 import { deliverOtp, canReachUser } from '../utils/otpDelivery.js';
 import { isTelegramConfigured, buildBotUrl } from '../utils/telegram.js';
 import { capabilitiesFor } from '../utils/roles.js';
@@ -40,7 +40,7 @@ router.get(
 router.post(
   '/request-otp',
   asyncHandler(async (req, res) => {
-    const phone = normalizePhone(req.body?.phone);
+    const phone = canonicalPhone(req.body?.phone);
     const parsed = phoneSchema.safeParse(phone);
     if (!parsed.success) throw httpError(400, 'A valid phone number is required');
 
@@ -53,10 +53,11 @@ router.post(
       [phone, codeHash, otpExpiryDate()],
     );
 
-    // Look up the user so we can prefer their linked Telegram chat.
+    // Look up the user so we can prefer their linked Telegram chat. Match any
+    // equivalent spelling so rows stored in local format still resolve.
     const { rows: userRows } = await query(
-      'SELECT id, telegram_chat_id FROM users WHERE phone = $1',
-      [phone],
+      'SELECT id, telegram_chat_id FROM users WHERE phone = ANY($1::text[])',
+      [phoneVariants(phone)],
     );
     const user = userRows[0] || null;
 
@@ -82,15 +83,15 @@ router.post(
 router.post(
   '/verify-otp',
   asyncHandler(async (req, res) => {
-    const phone = normalizePhone(req.body?.phone);
+    const phone = canonicalPhone(req.body?.phone);
     const code = String(req.body?.code || '').trim();
     if (!phone || !code) throw httpError(400, 'Phone and code are required');
 
     const { rows } = await query(
       `SELECT * FROM otp_codes
-       WHERE phone = $1 AND consumed_at IS NULL AND expires_at > now()
+       WHERE phone = ANY($1::text[]) AND consumed_at IS NULL AND expires_at > now()
        ORDER BY created_at DESC LIMIT 1`,
-      [phone],
+      [phoneVariants(phone)],
     );
     const otp = rows[0];
     if (!otp) throw httpError(400, 'No valid code found. Please request a new one.');
@@ -104,7 +105,10 @@ router.post(
 
     await query('UPDATE otp_codes SET consumed_at = now() WHERE id = $1', [otp.id]);
 
-    let { rows: userRows } = await query('SELECT * FROM users WHERE phone = $1', [phone]);
+    let { rows: userRows } = await query(
+      'SELECT * FROM users WHERE phone = ANY($1::text[])',
+      [phoneVariants(phone)],
+    );
     let user = userRows[0];
     let isNewUser = false;
 

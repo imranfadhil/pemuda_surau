@@ -19,6 +19,6 @@ export function otpExpiryDate() {
   return new Date(Date.now() + config.otpTtlMinutes * 60 * 1000);
 }
 
-export function normalizePhone(phone) {
-  return String(phone || '').replace(/[\s-]/g, '');
-}
+// Phone helpers live in utils/phone.js (no config dependency) and are
+// re-exported here so existing imports keep working.
+export { normalizePhone, phoneVariants, canonicalPhone } from './phone.js';

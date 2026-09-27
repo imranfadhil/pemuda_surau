@@ -158,6 +158,11 @@ See `.env.example`. Key ones:
 button. The user opens the bot, taps **Share my phone number**, and the bot links their account
 and sends a login code straight away — free, instant, and no admin involvement.
 
+**New members self-register through the bot.** Because Telegram verifies the shared number, an
+unknown number is not rejected: the bot creates the account on the spot (role `youth`, or
+`admin` if the number is in `ADMIN_PHONES`), links the chat, and sends a login code. The user
+then completes their profile and enrolls their face in the app.
+
 If a member hasn't linked Telegram yet, the app falls back through these channels:
 
 1. **Telegram** — free, unlimited. Primary channel.
@@ -188,7 +193,12 @@ read it out in person.
 
 Once linked, codes arrive as Telegram messages — no SMS costs. Because the phone number is
 shared through Telegram's verified contact button, a brand-new member can link and log in
-without ever needing an admin.
+without ever needing an admin — the account is created automatically on first contact.
+
+> **Phone formats.** Telegram's mobile app shares a contact's number **without** the leading
+> `+` (`60123456789`) while Desktop includes it (`+60123456789`). Numbers are stored
+> canonically as `+60…` and matched against every equivalent spelling (`60…`, `0…`, with or
+> without `+`), so linking works the same on both clients. See `server/src/utils/phone.js`.
 
 #### How updates are received (long-polling)
 

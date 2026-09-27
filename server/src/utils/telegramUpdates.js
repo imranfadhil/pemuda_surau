@@ -1,7 +1,7 @@
 import { query } from '../db.js';
 import { config } from '../config.js';
 import { sendTelegramMessage } from './telegram.js';
-import { generateOtp, hashOtp, otpExpiryDate, normalizePhone } from './otp.js';
+import { generateOtp, hashOtp, otpExpiryDate, normalizePhone, phoneVariants, canonicalPhone } from './otp.js';
 
 /**
  * Process a single Telegram update.
@@ -49,7 +49,8 @@ async function promptPhoneShare(chatId) {
     chatId,
     'Welcome to Pemuda Surau Al-Abqori! 👋\n\n' +
       'Tap the button below to share your phone number. We use it to find your ' +
-      'account and send your login code here.',
+      'account and send your login code here. New members are registered ' +
+      'automatically.',
     {
       replyMarkup: {
         keyboard: [[{ text: '📱 Share my phone number', request_contact: true }]],
@@ -76,15 +77,27 @@ async function handleContactShare(chatId, message) {
   }
 
   const phone = normalizePhone(contact.phone_number);
-  const user = await findUserByPhone(phone);
+  let user = await findUserByPhone(phone);
 
+  // Telegram verified this number, so a brand-new member can self-register
+  // right here: create the account on the spot instead of turning them away.
+  // (The app's login screen is Telegram-first, so there is no separate
+  // "register" step to send them to.)
+  let isNewUser = false;
   if (!user) {
-    await sendTelegramMessage(
-      chatId,
-      `We couldn't find an account for ${phone}.\n\n` +
-        'Please register in the app first, then come back and share your number again.',
+    const canonical = canonicalPhone(phone);
+    const role = config.adminPhones.includes(canonical) ? 'admin' : 'youth';
+    // ON CONFLICT guards against two updates racing on the same number;
+    // xmax = 0 tells us whether this call actually inserted the row.
+    const inserted = await query(
+      `INSERT INTO users (phone, full_name, role)
+       VALUES ($1, 'New Member', $2)
+       ON CONFLICT (phone) DO UPDATE SET updated_at = now()
+       RETURNING *, (xmax = 0) AS inserted`,
+      [canonical, role],
     );
-    return;
+    user = inserted.rows[0];
+    isNewUser = Boolean(inserted.rows[0].inserted);
   }
 
   if (!user.is_active) {
@@ -126,11 +139,16 @@ async function handleContactShare(chatId, message) {
     [user.phone, codeHash, otpExpiryDate()],
   );
 
+  const intro = isNewUser
+    ? `✅ Welcome! We've created your account for ${user.phone}.\n\n`
+    : `✅ Linked! You'll now receive your login codes here.\n\n`;
+
   await sendTelegramMessage(
     chatId,
-    `✅ Linked! You'll now receive your login codes here.\n\n` +
+    intro +
       `Your login code is <b>${code}</b>.\n` +
-      `It expires in ${config.otpTtlMinutes} minutes. Enter it in the app to sign in.`,
+      `It expires in ${config.otpTtlMinutes} minutes. Enter it in the app to sign in.` +
+      (isNewUser ? '\n\nAfter signing in, complete your profile and enroll your face.' : ''),
     { replyMarkup: { remove_keyboard: true } },
   );
 }
@@ -176,18 +194,17 @@ async function handleLinkToken(chatId, username, token) {
 }
 
 /**
- * Find a user by phone, tolerating local vs international formatting
- * (e.g. 0123456789 vs +60123456789).
+ * Find a user by phone, tolerating local vs international formatting and the
+ * leading '+' that Telegram's mobile app omits (e.g. 60123456789 vs
+ * +60123456789 vs 0123456789).
  */
 async function findUserByPhone(phone) {
-  const variants = new Set([phone]);
-  if (phone.startsWith('+')) variants.add(phone.slice(1));
-  if (phone.startsWith('0')) variants.add(`+60${phone.slice(1)}`);
-  if (phone.startsWith('+60')) variants.add(`0${phone.slice(3)}`);
+  const variants = phoneVariants(phone);
+  if (variants.length === 0) return null;
 
   const { rows } = await query(
     `SELECT * FROM users WHERE phone = ANY($1::text[]) LIMIT 1`,
-    [[...variants]],
+    [variants],
   );
   return rows[0] || null;
 }
