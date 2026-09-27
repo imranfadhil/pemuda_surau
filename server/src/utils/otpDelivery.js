@@ -14,7 +14,7 @@ import { sendTelegramMessage, isTelegramConfigured } from './telegram.js';
  */
 export async function deliverOtp({ user, phone, code }) {
   const message =
-    `Your Pemuda Surau verification code is <b>${code}</b>.\n` +
+    `Your Surau Al-Abqori verification code is <b>${code}</b>.\n` +
     `It expires in ${config.otpTtlMinutes} minutes.`;
 
   // 1. Telegram (preferred - free)

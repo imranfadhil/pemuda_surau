@@ -2,7 +2,7 @@
 setlocal enabledelayedexpansion
 
 REM ===================================================================
-REM  deploy.bat - Provision Pemuda Surau on a DigitalOcean Droplet
+REM  deploy.bat - Provision Surau Al-Abqori on a DigitalOcean Droplet
 REM  Creates the droplet with doctl (no manual IP needed), then pushes
 REM  the code and starts the stack.
 REM
@@ -22,7 +22,7 @@ call config.bat
 
 echo.
 echo ===============================================================
-echo    PEMUDA SURAU - DIGITALOCEAN DEPLOY
+echo    SURAU AL-ABQORI - DIGITALOCEAN DEPLOY
 echo ===============================================================
 echo.
 

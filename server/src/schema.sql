@@ -1,4 +1,4 @@
--- Pemuda Surau schema
+-- Surau Al-Abqori schema
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
 CREATE TABLE IF NOT EXISTS users (

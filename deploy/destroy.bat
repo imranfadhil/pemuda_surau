@@ -16,7 +16,7 @@ call config.bat
 
 echo.
 echo ===============================================================
-echo    DESTROY - Pemuda Surau (DigitalOcean)
+echo    DESTROY - Surau Al-Abqori (DigitalOcean)
 echo ===============================================================
 echo.
 

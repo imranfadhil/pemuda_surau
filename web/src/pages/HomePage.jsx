@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../lib/api.js';
 import { useAuth } from '../lib/auth.jsx';
-import { PRAYERS } from '../lib/constants.js';
+import { PRAYERS, SURAU } from '../lib/constants.js';
 
 export default function HomePage() {
   const { user } = useAuth();
@@ -26,6 +26,14 @@ export default function HomePage() {
     <div>
       <h1 className="page-title">Assalamualaikum, {user?.fullName?.split(' ')[0] || 'friend'} 👋</h1>
       <p className="page-sub">Here is your prayer attendance today.</p>
+
+      <div className="card">
+        <h2 className="card-title">🕌 {SURAU.name}</h2>
+        <p className="muted" style={{ margin: '6px 0' }}>{SURAU.address}</p>
+        <a href={SURAU.mapsUrl} target="_blank" rel="noreferrer">
+          {SURAU.latitude}° N, {SURAU.longitude}° E — Open in Maps
+        </a>
+      </div>
 
       {!user?.hasFace && (
         <div className="alert alert-info">

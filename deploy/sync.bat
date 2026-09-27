@@ -25,7 +25,7 @@ if "%1"=="--restart"     set BUILD=1
 if "%1"=="--from-deploy" set BUILD=1
 
 echo.
-echo === SYNC - Pemuda Surau (DigitalOcean) ===
+echo === SYNC - Surau Al-Abqori (DigitalOcean) ===
 echo.
 
 REM -- Resolve public IP ----------------------------------------------

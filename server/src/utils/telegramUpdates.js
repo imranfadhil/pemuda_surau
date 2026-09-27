@@ -22,7 +22,7 @@ export async function handleTelegramUpdate(update) {
   if (!token) {
     await sendTelegramMessage(
       chatId,
-      'Welcome to Pemuda Surau! Open the app and tap "Link Telegram" to connect your account.',
+      'Welcome to Surau Al-Abqori! Open the app and tap "Link Telegram" to connect your account.',
     );
     return;
   }
@@ -61,6 +61,6 @@ export async function handleTelegramUpdate(update) {
 
   await sendTelegramMessage(
     chatId,
-    '✅ Linked! You will now receive your Pemuda Surau login codes here.',
+    '✅ Linked! You will now receive your Surau Al-Abqori login codes here.',
   );
 }

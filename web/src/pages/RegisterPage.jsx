@@ -118,7 +118,6 @@ export default function RegisterPage() {
             <div className="field" style={{ flex: 1 }}>
               <label htmlFor="gender">Gender</label>
               <select id="gender" value={form.gender} onChange={(e) => update('gender', e.target.value)}>
-                <option value="">Prefer not to say</option>
                 <option value="male">Male</option>
                 <option value="female">Female</option>
               </select>

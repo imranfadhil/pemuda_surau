@@ -1,9 +1,11 @@
-# Pemuda Surau — Youth Prayer Attendance Tracker
+# Surau Al-Abqori — Youth Prayer Attendance Tracker
 
 Aplikasi untuk program orang muda surau — track youth attendance at the 5 daily prayers
 with phone-based face verification.
 
-A mobile-first web app for tracking youth attendance at the 5 daily prayers at your surau.
+A mobile-first web app for tracking youth attendance at the 5 daily prayers at
+**Surau Al-Abqori**, Jalan Cerdik, Taman Universiti, 43000 Kajang, Selangor, Malaysia
+(2.93276° N, 101.8047° E).
 Members check in from their phone using **face verification**; admins get a dashboard with
 statistics, rankings, and program management.
 

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../lib/api.js';
 import { useAuth } from '../lib/auth.jsx';
+import { SURAU } from '../lib/constants.js';
 
 export default function LoginPage() {
   const { login } = useAuth();
@@ -52,11 +53,23 @@ export default function LoginPage() {
       <div className="auth-card">
         <div className="auth-logo">🕌</div>
         <h1 className="center" style={{ margin: '0 0 4px', fontSize: '1.4rem' }}>
-          Pemuda Surau
+          {SURAU.name}
         </h1>
         <p className="center muted" style={{ marginBottom: 24 }}>
           Track your daily prayers
         </p>
+
+        <div className="alert alert-info" style={{ marginBottom: 20 }}>
+          <div>📍 {SURAU.address}</div>
+          <a
+            href={SURAU.mapsUrl}
+            target="_blank"
+            rel="noreferrer"
+            style={{ display: 'inline-block', marginTop: 6 }}
+          >
+            {SURAU.latitude}° N, {SURAU.longitude}° E — Open in Maps
+          </a>
+        </div>
 
         {error && <div className="alert alert-error">{error}</div>}
 

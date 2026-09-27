@@ -1,5 +1,5 @@
 #!/bin/bash
-# DigitalOcean cloud-init - Pemuda Surau
+# DigitalOcean cloud-init - Surau Al-Abqori
 # The "docker-20-04" marketplace image already has Docker + Compose installed,
 # so we just prepare the app directory. Code is pushed via sync.bat over SSH.
 

@@ -1,6 +1,6 @@
 # Deploying to DigitalOcean (doctl)
 
-Batch scripts that provision and manage the Pemuda Surau droplet entirely through
+Batch scripts that provision and manage the Surau Al-Abqori droplet entirely through
 **`doctl`** — no need to look up or paste an IP address. The scripts create the droplet,
 resolve its public IP automatically, push the code, and can destroy everything when done.
 

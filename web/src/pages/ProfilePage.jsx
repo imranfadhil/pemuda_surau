@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../lib/api.js';
 import { useAuth } from '../lib/auth.jsx';
-import { PRAYER_LABELS, formatDate } from '../lib/constants.js';
+import { PRAYER_LABELS, formatDate, SURAU } from '../lib/constants.js';
 
 function TelegramCard() {
   const { user, refreshUser } = useAuth();
@@ -131,6 +131,14 @@ export default function ProfilePage() {
       </div>
 
       <TelegramCard />
+
+      <div className="card">
+        <h2 className="card-title">🕌 {SURAU.name}</h2>
+        <p className="muted" style={{ margin: '6px 0' }}>{SURAU.address}</p>
+        <a href={SURAU.mapsUrl} target="_blank" rel="noreferrer">
+          {SURAU.latitude}° N, {SURAU.longitude}° E — Open in Maps
+        </a>
+      </div>
 
       <div className="card">
         <h2 className="card-title">Attendance history</h2>

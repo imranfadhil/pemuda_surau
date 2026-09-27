@@ -39,7 +39,7 @@ function TopBar() {
     <header className="topbar">
       <div className="brand">
         <span className="brand-logo">🕌</span>
-        <span>Pemuda Surau</span>
+        <span>Surau Al-Abqori</span>
       </div>
       <div className="topbar-user">
         <span>{user?.fullName}</span>
