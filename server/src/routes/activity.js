@@ -235,8 +235,10 @@ router.get(
  * Log a Quran activity.
  *
  * - Self-logging (or a guardian logging for their own dependent) needs no face.
- * - Staff recording for another member must be at the surau and scan that
- *   member's face, so activity can't be attributed to the wrong youth.
+ * - Staff recording for another member must be at the surau (geofence), but the
+ *   face scan is OPTIONAL: teachers often record a whole class in one sitting,
+ *   so they can select the member manually to move swiftly. When a scan is
+ *   supplied it is still verified, so a mismatch is caught.
  */
 router.post(
   '/quran',
@@ -249,10 +251,13 @@ router.post(
 
     const targetUserId = await resolveQuranTarget(req.user, forUserId);
 
-    // Recording for someone else (staff flow) requires presence + face match.
+    // Recording for someone else (staff flow) requires presence at the surau.
+    // The face scan is optional - if one was provided, verify it matches.
     if (targetUserId !== req.user.sub) {
       assertWithinGeofence(latitude, longitude);
-      await assertFaceMatches(targetUserId, descriptor);
+      if (descriptor) {
+        await assertFaceMatches(targetUserId, descriptor);
+      }
     }
 
     const { rows } = await query(

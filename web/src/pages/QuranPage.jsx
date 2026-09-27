@@ -2,14 +2,17 @@ import { useEffect, useState } from 'react';
 import { api } from '../lib/api.js';
 import { useAuth } from '../lib/auth.jsx';
 import FaceScan from '../components/FaceScan.jsx';
+import { getPosition } from '../lib/geo.js';
 import { formatDate, can } from '../lib/constants.js';
 
 /**
  * Quran activity page.
  *
  * - Members log their own recitation/memorization.
- * - Teachers (and admins) can scan a youth's face at the surau and record on
- *   their behalf; the record stores who submitted it.
+ * - Teachers (and admins) can record on a member's behalf. They must be at the
+ *   surau (geofence), but may select the member manually - a face scan is
+ *   optional, so a whole class can be recorded swiftly. The record stores who
+ *   submitted it.
  */
 export default function QuranPage() {
   const { user } = useAuth();
@@ -60,6 +63,15 @@ export default function QuranPage() {
     setNotice('');
     setBusy(true);
     try {
+      // Recording for another member requires presence at the surau. Reuse the
+      // scanned location when we have it, otherwise fetch it now.
+      let location = proof;
+      if (recordingForOther && !location) {
+        setNotice('Getting location…');
+        const pos = await getPosition();
+        location = { latitude: pos.latitude, longitude: pos.longitude };
+      }
+
       await api.logQuran({
         forUserId: form.userId || undefined,
         kind: form.kind,
@@ -67,7 +79,7 @@ export default function QuranPage() {
         juz: form.juz ? Number(form.juz) : null,
         pages: form.pages ? Number(form.pages) : null,
         note: form.note || null,
-        ...(proof || {}),
+        ...(location || {}),
       });
       setNotice('Quran activity recorded.');
       setForm({ userId: '', kind: form.kind, surah: '', juz: '', pages: '', note: '' });
@@ -134,7 +146,8 @@ export default function QuranPage() {
         {canManage && (
           <>
             <p className="muted" style={{ marginBottom: 12 }}>
-              Scan the member's face at the surau, then record their activity.
+              Select the member, then record their activity. You must be at the surau.
+              Scanning a face is optional.
             </p>
             {canIdentify && (
               <button
@@ -143,7 +156,7 @@ export default function QuranPage() {
                 style={{ marginBottom: 12 }}
                 onClick={() => setScanOpen(true)}
               >
-                📷 Scan member's face
+                📷 Scan face (optional)
               </button>
             )}
             {proof && (
@@ -226,7 +239,8 @@ export default function QuranPage() {
 
         {recordingForOther && !proof && (
           <div className="alert alert-info">
-            Recording for <strong>{selectedName}</strong> requires a face scan at the surau.
+            Recording for <strong>{selectedName}</strong>. Your location will be checked
+            to confirm you are at the surau.
           </div>
         )}
 
