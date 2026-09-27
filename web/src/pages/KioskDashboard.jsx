@@ -9,7 +9,7 @@ import { PRAYERS, CATEGORIES, badgeFor, SURAU } from '../lib/constants.js';
 // How long each leaderboard category stays on screen before rotating.
 const ROTATE_MS = 12000;
 // How many members to show per column (keeps everything on one screen).
-const TOP_N = 6;
+const TOP_N = 10;
 // How often to refresh data from the API.
 const REFRESH_MS = 60000;
 

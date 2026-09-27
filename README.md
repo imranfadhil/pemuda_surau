@@ -79,6 +79,41 @@ The Vite dev server proxies `/api` to `http://localhost:4000`.
 > **Dev tip:** with `SMS_PROVIDER=console`, OTP codes are printed to the API console *and*
 > returned in the response, so you can log in without a real SMS provider.
 
+## Simulating data (demo / pre-launch)
+
+To preview the dashboard and leaderboards with realistic data before go-live, seed a set of
+dummy members with three months of backdated activity:
+
+```bash
+docker compose exec -T api node scripts/simulate.mjs
+```
+
+This creates **60 members** (5 teachers, 10 AJK, 45 youths) with backdated attendance, Quran
+recitation/memorization logs, and merits. Every account is tagged `is_dummy = TRUE`.
+
+Remove all simulated data at any time (safe — real accounts are untouched):
+
+```bash
+docker compose exec -T api node scripts/simulate.mjs --clear
+```
+
+Tune the size with environment variables:
+
+```bash
+docker compose exec -T -e SIM_TOTAL=70 -e SIM_TEACHERS=6 -e SIM_AJK=10 -e SIM_DAYS=90 \
+  api node scripts/simulate.mjs
+```
+
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `SIM_TOTAL` | `60` | Total dummy members |
+| `SIM_TEACHERS` | `5` | How many are teachers |
+| `SIM_AJK` | `10` | How many are AJK / committee |
+| `SIM_DAYS` | `90` | Days of history to backdate |
+
+> Re-running the seed replaces the previous dummy data (it clears first), so it's safe to run
+> repeatedly. Dummy phones use the `+6019000xxxx` range so they never collide with real numbers.
+
 ## Environment variables
 
 See `.env.example`. Key ones:

@@ -20,6 +20,9 @@ CREATE TABLE IF NOT EXISTS users (
   telegram_chat_id TEXT,
   telegram_username TEXT,
   telegram_linked_at TIMESTAMPTZ,
+  -- Marks simulated/seeded accounts so they can be identified and removed
+  -- before go-live (see scripts/simulate.mjs).
+  is_dummy      BOOLEAN NOT NULL DEFAULT FALSE,
   is_active     BOOLEAN NOT NULL DEFAULT TRUE,
   created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at    TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -152,3 +155,22 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_users_telegram_chat
 ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check;
 ALTER TABLE users ADD CONSTRAINT users_role_check
   CHECK (role IN ('youth', 'admin', 'parent', 'teacher', 'ajk'));
+
+-- Simulated accounts are tagged so they can be cleared before go-live.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS is_dummy BOOLEAN NOT NULL DEFAULT FALSE;
+CREATE INDEX IF NOT EXISTS idx_users_dummy ON users (is_dummy) WHERE is_dummy = TRUE;
+
+-- Deleting a user must not be blocked by rows that merely reference them.
+-- Attendance/merits/quran rows cascade with the user; the "who did it"
+-- references are nulled so the history of others is preserved.
+ALTER TABLE attendance DROP CONSTRAINT IF EXISTS attendance_verified_by_fkey;
+ALTER TABLE attendance ADD CONSTRAINT attendance_verified_by_fkey
+  FOREIGN KEY (verified_by) REFERENCES users(id) ON DELETE SET NULL;
+
+ALTER TABLE merits DROP CONSTRAINT IF EXISTS merits_awarded_by_fkey;
+ALTER TABLE merits ADD CONSTRAINT merits_awarded_by_fkey
+  FOREIGN KEY (awarded_by) REFERENCES users(id) ON DELETE SET NULL;
+
+ALTER TABLE programs DROP CONSTRAINT IF EXISTS programs_created_by_fkey;
+ALTER TABLE programs ADD CONSTRAINT programs_created_by_fkey
+  FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL;
