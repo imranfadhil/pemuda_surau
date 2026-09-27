@@ -1,6 +1,4 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { QRCodeSVG } from 'qrcode.react';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
 } from 'recharts';
@@ -15,14 +13,6 @@ export default function DashboardPage() {
   const [period, setPeriod] = useState('month');
   const [category, setCategory] = useState('overall');
   const [loading, setLoading] = useState(true);
-  const [loginUrl, setLoginUrl] = useState('');
-  const [qrOpen, setQrOpen] = useState(false);
-
-  useEffect(() => {
-    // Auto-generate the login link from the current URL so the QR always
-    // points at wherever this app is being served from.
-    setLoginUrl(`${window.location.origin}/login`);
-  }, []);
 
   useEffect(() => {
     api.stats().then(setStats).catch(() => {});
@@ -176,43 +166,6 @@ export default function DashboardPage() {
             </BarChart>
           </ResponsiveContainer>
         </div>
-      </div>
-
-      {/* ---- Floating login QR (bottom right) ---- */}
-      <div className={`qr-float ${qrOpen ? 'open' : ''}`}>
-        {qrOpen && (
-          <div className="qr-float-panel">
-            <div className="row-between" style={{ marginBottom: 8 }}>
-              <strong>📱 Scan to log in</strong>
-              <button className="qr-close" onClick={() => setQrOpen(false)} aria-label="Close">
-                ✕
-              </button>
-            </div>
-            <div className="qr-box">
-              {loginUrl && <QRCodeSVG value={loginUrl} size={148} level="M" marginSize={1} />}
-            </div>
-            <p className="muted" style={{ margin: '10px 0 0', textAlign: 'center' }}>
-              Point your phone camera here to open the login page.
-            </p>
-            {user ? (
-              <Link className="btn btn-sm btn-block" style={{ marginTop: 10 }} to="/check-in">
-                Go to check-in
-              </Link>
-            ) : (
-              <Link className="btn btn-sm btn-block" style={{ marginTop: 10 }} to="/login">
-                Log in
-              </Link>
-            )}
-          </div>
-        )}
-        <button
-          className="qr-fab"
-          onClick={() => setQrOpen((v) => !v)}
-          aria-label="Show login QR code"
-          title="Scan to log in"
-        >
-          {qrOpen ? '✕' : '📱'}
-        </button>
       </div>
     </div>
   );

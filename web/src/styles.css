@@ -189,27 +189,7 @@ textarea:focus {
   margin: 0 0 4px;
 }
 
-/* ---- Login QR (floating, bottom right) ---- */
-.qr-float {
-  position: fixed;
-  right: 20px;
-  bottom: 84px;
-  z-index: 30;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 10px;
-}
-
-.qr-float-panel {
-  background: white;
-  border-radius: 16px;
-  padding: 14px;
-  width: 220px;
-  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.22);
-  border: 1px solid var(--slate-100);
-}
-
+/* ---- Login QR box (used by the kiosk display) ---- */
 .qr-box {
   background: white;
   padding: 8px;
@@ -218,29 +198,6 @@ textarea:focus {
   line-height: 0;
   display: grid;
   place-items: center;
-}
-
-.qr-fab {
-  width: 56px;
-  height: 56px;
-  border-radius: 50%;
-  background: var(--teal-700);
-  color: white;
-  font-size: 1.4rem;
-  box-shadow: 0 10px 24px rgba(15, 118, 110, 0.4);
-  display: grid;
-  place-items: center;
-}
-
-.qr-fab:hover {
-  background: var(--teal-600);
-}
-
-.qr-close {
-  background: transparent;
-  color: var(--slate-600);
-  font-size: 0.9rem;
-  padding: 2px 6px;
 }
 
 /* ---- Badges ---- */
@@ -620,4 +577,230 @@ textarea:focus {
   place-items: center;
   font-size: 1.8rem;
   margin: 0 auto 16px;
+}
+
+/* ---- Kiosk / wall display (non-scrolling) ---- */
+.kiosk {
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(160deg, var(--teal-700), var(--teal-900));
+  color: white;
+  padding: 20px 24px;
+  gap: 16px;
+}
+
+.kiosk-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+}
+
+.kiosk-brand {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.kiosk-brand .brand-logo {
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  font-size: 1.7rem;
+}
+
+.kiosk-title {
+  font-size: 1.7rem;
+  font-weight: 800;
+  line-height: 1.1;
+}
+
+.kiosk-sub {
+  font-size: 0.9rem;
+  opacity: 0.8;
+}
+
+.kiosk-clock {
+  text-align: right;
+}
+
+.kiosk-time {
+  font-size: 2.4rem;
+  font-weight: 800;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.kiosk-date {
+  font-size: 0.9rem;
+  opacity: 0.8;
+}
+
+.kiosk-body {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 1fr 340px;
+  gap: 16px;
+}
+
+.kiosk-left {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.kiosk-right {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.kiosk .card {
+  color: var(--slate-900);
+  margin: 0;
+}
+
+.kiosk-leaderboard {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.kiosk-cat {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.kiosk-dots {
+  display: flex;
+  gap: 5px;
+}
+
+.kiosk-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--slate-200);
+}
+
+.kiosk-dot.active {
+  background: var(--teal-600);
+}
+
+.kiosk-leader-grid {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  margin-top: 12px;
+}
+
+.kiosk-leader-col {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.kiosk-leader-head {
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--slate-600);
+  padding-bottom: 8px;
+  border-bottom: 2px solid var(--slate-100);
+}
+
+.kiosk-leader-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--slate-100);
+}
+
+.kiosk-leader-row:last-child {
+  border-bottom: none;
+}
+
+.kiosk-leader-name {
+  flex: 1;
+  font-weight: 600;
+  font-size: 1.05rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.kiosk-leader-score {
+  font-weight: 800;
+  font-size: 1.2rem;
+  color: var(--teal-700);
+  font-variant-numeric: tabular-nums;
+}
+
+.kiosk-chart {
+  flex-shrink: 0;
+}
+
+.kiosk-chart-body {
+  width: 100%;
+  height: 170px;
+  margin-top: 8px;
+}
+
+.kiosk-qr {
+  flex-shrink: 0;
+  text-align: center;
+}
+
+.kiosk-qr-box {
+  margin: 12px auto 0;
+  width: fit-content;
+}
+
+.kiosk-qr-hint {
+  margin: 12px 0 0;
+}
+
+.kiosk-stats {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  align-content: start;
+}
+
+.kiosk-stats .stat {
+  padding: 12px;
+}
+
+.kiosk-stats .stat .value {
+  font-size: 1.5rem;
+}
+
+.kiosk-stats .stat .label {
+  font-size: 0.68rem;
+}
+
+/* Narrow screens: stack the columns but still avoid scrolling. */
+@media (max-width: 900px) {
+  .kiosk-body {
+    grid-template-columns: 1fr;
+  }
+  .kiosk-right {
+    flex-direction: row;
+  }
+  .kiosk-stats {
+    grid-template-columns: repeat(3, 1fr);
+  }
 }

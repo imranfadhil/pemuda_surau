@@ -6,6 +6,7 @@ import RegisterPage from './pages/RegisterPage.jsx';
 import HomePage from './pages/HomePage.jsx';
 import CheckInPage from './pages/CheckInPage.jsx';
 import DashboardPage from './pages/DashboardPage.jsx';
+import KioskDashboard from './pages/KioskDashboard.jsx';
 import ProgramsPage from './pages/ProgramsPage.jsx';
 import ProfilePage from './pages/ProfilePage.jsx';
 import DependentPage from './pages/DependentPage.jsx';
@@ -48,7 +49,7 @@ function TopBar() {
     <header className="topbar">
       <Link className="brand" to="/">
         <span className="brand-logo">🕌</span>
-        <span>Surau Al-Abqori</span>
+        <span>Pemuda Surau Al-Abqori</span>
       </Link>
       <div className="topbar-user">
         {user ? (
@@ -92,78 +93,87 @@ export default function App() {
   return (
     <Routes>
       <Route path="/login" element={token ? <Navigate to="/" replace /> : <LoginPage />} />
+      {/* Full-screen wall display — always public, no app chrome. */}
+      <Route path="/display" element={<KioskDashboard />} />
       <Route
         path="/*"
         element={
-          <div className="app-shell">
-            <TopBar />
-            <main className="main">
-              <Routes>
-                {/* Public landing page — visible without login. */}
-                <Route path="/" element={<DashboardPage />} />
-                <Route
-                  path="/home"
-                  element={
-                    <Protected>
-                      <HomePage />
-                    </Protected>
-                  }
-                />
-                <Route
-                  path="/check-in"
-                  element={
-                    <Protected>
-                      <CheckInPage />
-                    </Protected>
-                  }
-                />
-                <Route
-                  path="/programs"
-                  element={
-                    <Protected>
-                      <ProgramsPage />
-                    </Protected>
-                  }
-                />
-                <Route
-                  path="/profile"
-                  element={
-                    <Protected>
-                      <ProfilePage />
-                    </Protected>
-                  }
-                />
-                <Route
-                  path="/register"
-                  element={
-                    <Protected>
-                      <RegisterPage />
-                    </Protected>
-                  }
-                />
-                <Route
-                  path="/family"
-                  element={
-                    <Protected>
-                      <DependentPage />
-                    </Protected>
-                  }
-                />
-                <Route
-                  path="/admin"
-                  element={
-                    <Protected>
-                      <AdminOnly>
-                        <AdminPage />
-                      </AdminOnly>
-                    </Protected>
-                  }
-                />
-                <Route path="*" element={<Navigate to="/" replace />} />
-              </Routes>
-            </main>
-            <BottomNav />
-          </div>
+          token ? (
+            <div className="app-shell">
+              <TopBar />
+              <main className="main">
+                <Routes>
+                  <Route path="/" element={<DashboardPage />} />
+                  <Route
+                    path="/home"
+                    element={
+                      <Protected>
+                        <HomePage />
+                      </Protected>
+                    }
+                  />
+                  <Route
+                    path="/check-in"
+                    element={
+                      <Protected>
+                        <CheckInPage />
+                      </Protected>
+                    }
+                  />
+                  <Route
+                    path="/programs"
+                    element={
+                      <Protected>
+                        <ProgramsPage />
+                      </Protected>
+                    }
+                  />
+                  <Route
+                    path="/profile"
+                    element={
+                      <Protected>
+                        <ProfilePage />
+                      </Protected>
+                    }
+                  />
+                  <Route
+                    path="/register"
+                    element={
+                      <Protected>
+                        <RegisterPage />
+                      </Protected>
+                    }
+                  />
+                  <Route
+                    path="/family"
+                    element={
+                      <Protected>
+                        <DependentPage />
+                      </Protected>
+                    }
+                  />
+                  <Route
+                    path="/admin"
+                    element={
+                      <Protected>
+                        <AdminOnly>
+                          <AdminPage />
+                        </AdminOnly>
+                      </Protected>
+                    }
+                  />
+                  <Route path="*" element={<Navigate to="/" replace />} />
+                </Routes>
+              </main>
+              <BottomNav />
+            </div>
+          ) : (
+            /* Logged out: the landing page is the non-scrolling wall display. */
+            <Routes>
+              <Route path="/" element={<KioskDashboard />} />
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          )
         }
       />
     </Routes>
