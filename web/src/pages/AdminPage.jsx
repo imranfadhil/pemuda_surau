@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '../lib/api.js';
 import { useAuth } from '../lib/auth.jsx';
+import FaceScan from '../components/FaceScan.jsx';
 import {
   PRAYERS, PRAYER_LABELS, todayISO, formatDate, ROLES, ROLE_LABELS, can,
 } from '../lib/constants.js';
@@ -11,6 +12,7 @@ export default function AdminPage() {
   const canMerits = can(user, 'manageMerits');
   const canQuran = can(user, 'manageQuran');
   const canAttendance = can(user, 'manageAttendance');
+  const canIdentify = can(user, 'identifyMembers');
 
   const [tab, setTab] = useState(isAdmin ? 'members' : canQuran ? 'quran' : 'merits');
   const [users, setUsers] = useState([]);
@@ -27,6 +29,9 @@ export default function AdminPage() {
   const [quranForm, setQuranForm] = useState({
     userId: '', kind: 'recitation', surah: '', juz: '', pages: '', note: '',
   });
+  // Face-scan flow: which form the scan is filling in, plus the verified proof.
+  const [scanFor, setScanFor] = useState(null); // 'quran' | 'merits' | null
+  const [proof, setProof] = useState(null); // { descriptor, latitude, longitude }
 
   function loadUsers() {
     api.listUsers().then((d) => setUsers(d.users)).catch((e) => setError(e.message));
@@ -110,9 +115,11 @@ export default function AdminPage() {
         userId: meritForm.userId,
         points: Number(meritForm.points),
         reason: meritForm.reason,
+        ...(proof || {}),
       });
       setNotice('Merit awarded.');
       setMeritForm({ userId: '', points: 5, reason: '' });
+      setProof(null);
       loadMerits();
     } catch (err) {
       setError(err.message);
@@ -141,13 +148,27 @@ export default function AdminPage() {
         juz: quranForm.juz ? Number(quranForm.juz) : null,
         pages: quranForm.pages ? Number(quranForm.pages) : null,
         note: quranForm.note || null,
+        ...(proof || {}),
       });
       setNotice('Quran activity recorded.');
       setQuranForm({ userId: '', kind: quranForm.kind, surah: '', juz: '', pages: '', note: '' });
+      setProof(null);
       loadQuran();
     } catch (err) {
       setError(err.message);
     }
+  }
+
+  /** Called when the staff member confirms the scanned face. */
+  function onScanConfirmed({ member, descriptor, latitude, longitude }) {
+    setProof({ descriptor, latitude, longitude });
+    if (scanFor === 'quran') {
+      setQuranForm((f) => ({ ...f, userId: member.id }));
+    } else if (scanFor === 'merits') {
+      setMeritForm((f) => ({ ...f, userId: member.id }));
+    }
+    setScanFor(null);
+    setNotice(`Scanned ${member.fullName}. Complete the form to record.`);
   }
 
   async function removeQuran(id) {
@@ -362,16 +383,44 @@ export default function AdminPage() {
 
       {tab === 'quran' && canQuran && (
         <>
+          {scanFor === 'quran' && (
+            <FaceScan onConfirmed={onScanConfirmed} onCancel={() => setScanFor(null)} />
+          )}
+
           <form className="card" onSubmit={submitQuran}>
             <h2 className="card-title">📖 Record Quran activity</h2>
             <p className="muted" style={{ marginBottom: 12 }}>
-              Log recitation or memorization for a member.
+              Scan the member's face at the surau, then record their recitation or memorization.
             </p>
+
+            {canIdentify && (
+              <button
+                type="button"
+                className="btn btn-secondary btn-block"
+                style={{ marginBottom: 12 }}
+                onClick={() => setScanFor('quran')}
+              >
+                📷 Scan member's face
+              </button>
+            )}
+
+            {proof && (
+              <div className="alert alert-success">
+                ✅ Face verified for{' '}
+                <strong>
+                  {memberOptions.find((u) => u.id === quranForm.userId)?.fullName || 'member'}
+                </strong>
+              </div>
+            )}
+
             <div className="field">
               <label>Member</label>
               <select
                 value={quranForm.userId}
-                onChange={(e) => setQuranForm({ ...quranForm, userId: e.target.value })}
+                onChange={(e) => {
+                  setQuranForm({ ...quranForm, userId: e.target.value });
+                  setProof(null);
+                }}
                 required
               >
                 <option value="">Select member…</option>
@@ -459,16 +508,44 @@ export default function AdminPage() {
 
       {tab === 'merits' && canMerits && (
         <>
+          {scanFor === 'merits' && (
+            <FaceScan onConfirmed={onScanConfirmed} onCancel={() => setScanFor(null)} />
+          )}
+
           <form className="card" onSubmit={submitMerit}>
             <h2 className="card-title">🏅 Award merits</h2>
             <p className="muted" style={{ marginBottom: 12 }}>
-              Give points to a member for good behaviour, helping out, or contributions.
+              Scan the member's face at the surau, then award points for good behaviour.
             </p>
+
+            {canIdentify && (
+              <button
+                type="button"
+                className="btn btn-secondary btn-block"
+                style={{ marginBottom: 12 }}
+                onClick={() => setScanFor('merits')}
+              >
+                📷 Scan member's face
+              </button>
+            )}
+
+            {proof && (
+              <div className="alert alert-success">
+                ✅ Face verified for{' '}
+                <strong>
+                  {users.find((u) => u.id === meritForm.userId)?.fullName || 'member'}
+                </strong>
+              </div>
+            )}
+
             <div className="field">
               <label>Member</label>
               <select
                 value={meritForm.userId}
-                onChange={(e) => setMeritForm({ ...meritForm, userId: e.target.value })}
+                onChange={(e) => {
+                  setMeritForm({ ...meritForm, userId: e.target.value });
+                  setProof(null);
+                }}
                 required
               >
                 <option value="">Select member…</option>

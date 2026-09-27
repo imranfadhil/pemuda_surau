@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { api } from '../lib/api.js';
 import { startCamera, stopCamera, captureDescriptor, loadModels } from '../lib/face.js';
+import { getPosition } from '../lib/geo.js';
 import { PRAYERS, PRAYER_LABELS } from '../lib/constants.js';
 
 function formatClock(iso) {
@@ -93,9 +94,17 @@ export default function CheckInPage() {
         setStatus('No face detected. Move closer and improve lighting.');
         return;
       }
+      // The device must be at the surau; the server enforces the geofence.
+      setStatus('Getting location…');
+      const pos = await getPosition();
       // The server infers the prayer from the current window.
-      const payload = { descriptor: captured.descriptor };
+      const payload = {
+        descriptor: captured.descriptor,
+        latitude: pos.latitude,
+        longitude: pos.longitude,
+      };
       if (selected?.isDependent) payload.forUserId = selected.id;
+      setStatus('Verifying…');
       const res = await api.checkIn(payload);
       setResult(res);
       setStatus('');

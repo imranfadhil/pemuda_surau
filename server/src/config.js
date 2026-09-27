@@ -40,6 +40,12 @@ export const config = {
     // When false, the client may pick any prayer (legacy behaviour).
     enforceWindow: (process.env.PRAYER_WINDOW_ENFORCED || 'true') !== 'false',
   },
+  // Geofence: check-ins are only accepted within this radius of the surau.
+  // Uses the same coordinates as prayer times.
+  geofence: {
+    enabled: (process.env.GEOFENCE_ENABLED || 'true') !== 'false',
+    radiusMeters: Number(process.env.GEOFENCE_RADIUS_METERS || 150),
+  },
   // How OTP codes are delivered: telegram | sms | console
   otpChannel: process.env.OTP_CHANNEL || 'console',
   // Public base URL of the app (used for Telegram webhook registration)

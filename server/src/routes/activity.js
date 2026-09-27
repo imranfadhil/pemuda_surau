@@ -6,13 +6,23 @@ import { asyncHandler, httpError } from '../middleware/errors.js';
 import { dateInTz } from '../utils/timezone.js';
 import { config } from '../config.js';
 import { roleHasCapability } from '../utils/roles.js';
+import { isValidDescriptor, findBestMatch } from '../utils/face.js';
+import { withinGeofence, isValidCoordinate } from '../utils/geo.js';
 
 const router = Router();
+
+// Optional face + location, required when staff record for another member.
+const verificationFields = {
+  descriptor: z.array(z.number()).length(128).optional(),
+  latitude: z.number().optional().nullable(),
+  longitude: z.number().optional().nullable(),
+};
 
 const meritSchema = z.object({
   userId: z.string().uuid(),
   points: z.number().int().min(1).max(100),
   reason: z.string().min(2).max(300),
+  ...verificationFields,
 });
 
 const quranSchema = z.object({
@@ -23,10 +33,59 @@ const quranSchema = z.object({
   note: z.string().max(500).optional().nullable(),
   // Optional: log on behalf of a dependent (child) managed by the caller.
   forUserId: z.string().uuid().optional(),
+  ...verificationFields,
 });
 
 function todayInTimezone() {
   return dateInTz(new Date(), config.prayer.timezone);
+}
+
+/**
+ * Enforce the geofence when enabled. Throws 403 when the device is outside
+ * the surau's radius.
+ */
+function assertWithinGeofence(latitude, longitude) {
+  if (!config.geofence.enabled) return null;
+  if (!isValidCoordinate(latitude, longitude)) {
+    throw httpError(
+      403,
+      'Location is required to record activity. Please allow location access and try again.',
+    );
+  }
+  const { ok, distance } = withinGeofence(latitude, longitude, {
+    latitude: config.prayer.latitude,
+    longitude: config.prayer.longitude,
+    radiusMeters: config.geofence.radiusMeters,
+  });
+  if (!ok) {
+    throw httpError(
+      403,
+      `You must be at the surau to record activity (you are about ${distance} m away).`,
+    );
+  }
+  return distance;
+}
+
+/**
+ * Verify that a live face descriptor belongs to `targetUserId`.
+ * Used when staff record activity on behalf of another member.
+ */
+async function assertFaceMatches(targetUserId, descriptor) {
+  if (!isValidDescriptor(descriptor)) {
+    throw httpError(400, 'A face scan is required to record activity for a member.');
+  }
+  const { rows } = await query(
+    `SELECT id, full_name, face_descriptor FROM users
+     WHERE is_active = TRUE AND face_descriptor IS NOT NULL`,
+  );
+  const match = findBestMatch(descriptor, rows, config.faceMatchThreshold);
+  if (!match) {
+    throw httpError(401, 'Face not recognized. Please try again or see an admin.');
+  }
+  if (match.user.id !== targetUserId) {
+    throw httpError(403, `This face does not match the selected member (${match.user.full_name}).`);
+  }
+  return match;
 }
 
 /**
@@ -95,7 +154,7 @@ router.get(
   }),
 );
 
-/** Staff: award merits to a member. */
+/** Staff: award merits to a member (face + location verified). */
 router.post(
   '/merits',
   requireAuth,
@@ -103,10 +162,14 @@ router.post(
   asyncHandler(async (req, res) => {
     const parsed = meritSchema.safeParse(req.body);
     if (!parsed.success) throw httpError(400, 'Invalid merit data');
-    const { userId, points, reason } = parsed.data;
+    const { userId, points, reason, descriptor, latitude, longitude } = parsed.data;
 
     const { rows: userRows } = await query('SELECT id FROM users WHERE id = $1', [userId]);
     if (!userRows[0]) throw httpError(404, 'User not found');
+
+    // The member must be present at the surau, and the scanned face must be theirs.
+    assertWithinGeofence(latitude, longitude);
+    await assertFaceMatches(userId, descriptor);
 
     const { rows } = await query(
       `INSERT INTO merits (user_id, points, reason, awarded_by)
@@ -164,16 +227,29 @@ router.get(
   }),
 );
 
-/** Log a Quran activity (self, a dependent, or any member for teachers/admins). */
+/**
+ * Log a Quran activity.
+ *
+ * - Self-logging (or a guardian logging for their own dependent) needs no face.
+ * - Staff recording for another member must be at the surau and scan that
+ *   member's face, so activity can't be attributed to the wrong youth.
+ */
 router.post(
   '/quran',
   requireAuth,
   asyncHandler(async (req, res) => {
     const parsed = quranSchema.safeParse(req.body);
     if (!parsed.success) throw httpError(400, 'Invalid Quran log data');
-    const { kind, surah, juz, pages, note, forUserId } = parsed.data;
+    const { kind, surah, juz, pages, note, forUserId, descriptor, latitude, longitude } =
+      parsed.data;
 
     const targetUserId = await resolveQuranTarget(req.user, forUserId);
+
+    // Recording for someone else (staff flow) requires presence + face match.
+    if (targetUserId !== req.user.sub) {
+      assertWithinGeofence(latitude, longitude);
+      await assertFaceMatches(targetUserId, descriptor);
+    }
 
     const { rows } = await query(
       `INSERT INTO quran_logs (user_id, kind, surah, juz, pages, note, logged_date)

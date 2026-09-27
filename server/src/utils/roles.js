@@ -32,11 +32,12 @@ export const CAPABILITIES = {
     'manageAttendance',
     'manageDependents',
     'viewMembers',
+    'identifyMembers',
     'checkIn',
   ],
   parent: ['manageDependents', 'checkIn'],
-  teacher: ['manageQuran', 'manageMerits', 'viewMembers', 'checkIn'],
-  ajk: ['manageMerits', 'viewMembers', 'checkIn'],
+  teacher: ['manageQuran', 'manageMerits', 'viewMembers', 'identifyMembers', 'checkIn'],
+  ajk: ['manageMerits', 'viewMembers', 'identifyMembers', 'checkIn'],
   youth: ['checkIn'],
 };
 

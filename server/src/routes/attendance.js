@@ -2,9 +2,10 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { query } from '../db.js';
 import { config } from '../config.js';
-import { requireAuth, requireAdmin } from '../middleware/auth.js';
+import { requireAuth, requireAdmin, requireCapability } from '../middleware/auth.js';
 import { asyncHandler, httpError } from '../middleware/errors.js';
 import { isValidDescriptor, findBestMatch } from '../utils/face.js';
+import { withinGeofence, isValidCoordinate } from '../utils/geo.js';
 import { getCurrentWindow, getPrayerWindows, PRAYER_KEYS } from '../utils/prayerTimes.js';
 import { dateInTz } from '../utils/timezone.js';
 
@@ -22,9 +23,41 @@ const checkInSchema = z.object({
   forUserId: z.string().uuid().optional(),
 });
 
+const identifySchema = z.object({
+  descriptor: z.array(z.number()).length(128),
+  latitude: z.number().optional().nullable(),
+  longitude: z.number().optional().nullable(),
+});
+
 function todayInTimezone() {
   // Attendance day is based on the surau's timezone, not the server's.
   return dateInTz(new Date(), config.prayer.timezone);
+}
+
+/**
+ * Enforce the geofence when enabled. Throws a 403 with a helpful message
+ * when the device is outside the surau's radius.
+ */
+function assertWithinGeofence(latitude, longitude) {
+  if (!config.geofence.enabled) return null;
+  if (!isValidCoordinate(latitude, longitude)) {
+    throw httpError(
+      403,
+      'Location is required to check in. Please allow location access and try again.',
+    );
+  }
+  const { ok, distance } = withinGeofence(latitude, longitude, {
+    latitude: config.prayer.latitude,
+    longitude: config.prayer.longitude,
+    radiusMeters: config.geofence.radiusMeters,
+  });
+  if (!ok) {
+    throw httpError(
+      403,
+      `You must be at the surau to check in (you are about ${distance} m away).`,
+    );
+  }
+  return distance;
 }
 
 function formatWindow(w) {
@@ -58,6 +91,68 @@ router.get(
 );
 
 /**
+ * Staff: identify a member from a live face scan (1-to-many).
+ *
+ * Used by teachers/AJK to scan a youth's face at the surau and get a
+ * *suggestion* of who it is. The client must confirm before recording
+ * anything, so a false match can never silently mis-attribute activity.
+ *
+ * Returns the best match plus the runner-up (for confidence display).
+ */
+router.post(
+  '/identify',
+  requireAuth,
+  requireCapability('identifyMembers'),
+  asyncHandler(async (req, res) => {
+    const parsed = identifySchema.safeParse(req.body);
+    if (!parsed.success) throw httpError(400, 'Invalid identify payload');
+    const { descriptor, latitude, longitude } = parsed.data;
+
+    if (!isValidDescriptor(descriptor)) throw httpError(400, 'Invalid face descriptor');
+
+    // Staff must also be at the surau when scanning.
+    const distanceFromSurau = assertWithinGeofence(latitude, longitude);
+
+    const { rows: candidates } = await query(
+      `SELECT id, full_name, guardian_id, face_descriptor FROM users
+       WHERE is_active = TRUE AND face_descriptor IS NOT NULL`,
+    );
+
+    // Rank all candidates by distance so we can show a confidence margin.
+    const ranked = candidates
+      .map((c) => {
+        const match = findBestMatch(descriptor, [c], config.faceMatchThreshold);
+        return match ? { id: c.id, fullName: c.full_name, isDependent: Boolean(c.guardian_id), distance: match.distance } : null;
+      })
+      .filter(Boolean)
+      .sort((a, b) => a.distance - b.distance);
+
+    const best = ranked[0] || null;
+    if (!best) {
+      throw httpError(404, 'No matching member found. They may not have enrolled their face yet.');
+    }
+
+    const runnerUp = ranked[1] || null;
+    res.json({
+      match: {
+        id: best.id,
+        fullName: best.fullName,
+        isDependent: best.isDependent,
+        confidence: Number((1 - best.distance).toFixed(3)),
+      },
+      runnerUp: runnerUp
+        ? {
+            id: runnerUp.id,
+            fullName: runnerUp.fullName,
+            confidence: Number((1 - runnerUp.distance).toFixed(3)),
+          }
+        : null,
+      distanceFromSurau,
+    });
+  }),
+);
+
+/**
  * Face-verified check-in.
  * The client sends the live face descriptor; we match it against all enrolled
  * users and record attendance for the best match within the threshold.
@@ -74,6 +169,9 @@ router.post(
     const { descriptor, latitude, longitude, forUserId } = parsed.data;
 
     if (!isValidDescriptor(descriptor)) throw httpError(400, 'Invalid face descriptor');
+
+    // The device must be at the surau.
+    assertWithinGeofence(latitude, longitude);
 
     // A guardian may check in on behalf of a dependent (child) they manage.
     // The verified face must belong to that dependent.
