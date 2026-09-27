@@ -41,7 +41,8 @@ function TelegramCard() {
     <div className="card">
       <h2 className="card-title">Telegram login</h2>
       <p className="muted" style={{ marginBottom: 12 }}>
-        Link Telegram to receive your login codes instantly — free, no SMS charges.
+        Telegram is the main way to sign in — your login codes arrive instantly and free, with no
+        SMS charges.
       </p>
 
       {error && <div className="alert alert-error">{error}</div>}

@@ -6,10 +6,33 @@ import { signToken, requireAuth } from '../middleware/auth.js';
 import { asyncHandler, httpError } from '../middleware/errors.js';
 import { generateOtp, hashOtp, verifyOtp, otpExpiryDate, normalizePhone } from '../utils/otp.js';
 import { deliverOtp, canReachUser } from '../utils/otpDelivery.js';
+import { isTelegramConfigured, buildBotUrl } from '../utils/telegram.js';
 
 const router = Router();
 
 const phoneSchema = z.string().min(8).max(20);
+
+/**
+ * Public: how a user can sign in.
+ *
+ * Telegram is the primary channel. When it is configured we point the client at
+ * the bot so the user can link their account and receive a code there. The
+ * admin-assisted path is only a last resort.
+ */
+router.get(
+  '/login-options',
+  asyncHandler(async (req, res) => {
+    res.json({
+      telegram: {
+        available: isTelegramConfigured(),
+        botUrl: buildBotUrl(),
+        botUsername: config.telegram.botUsername || null,
+      },
+      sms: { available: config.sms.provider !== 'console' },
+      adminAssisted: true,
+    });
+  }),
+);
 
 /** Step 1: request an OTP for a phone number. */
 router.post(
@@ -42,6 +65,11 @@ router.post(
       channel: delivery.channel,
       // Tell the client whether an admin needs to read the code out.
       needsAdminHelp: !canReachUser(user),
+      // Telegram-first: if the user hasn't linked yet, offer the bot so they
+      // can link and get their code there instead of relying on an admin.
+      telegramAvailable: isTelegramConfigured(),
+      telegramLinked: Boolean(user?.telegram_chat_id),
+      botUrl: buildBotUrl(),
       // In non-production we return the code to make local testing easy.
       devCode: config.env === 'production' ? undefined : code,
     });

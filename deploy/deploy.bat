@@ -13,9 +13,13 @@ cd /d "%~dp0"
 set DEPLOY_DIR=%CD%
 
 if not exist "config.bat" (
-  echo [deploy] config.bat not found - creating from config.example.bat
-  copy /Y "config.example.bat" "config.bat" >nul
-  echo [deploy] Edit deploy\config.bat with your settings, then re-run.
+  echo [deploy] config.bat not found - seeding from .env via config.example.bat
+  call "%DEPLOY_DIR%\seed-config.bat"
+  if not exist "config.bat" (
+    echo [deploy] Could not create config.bat. Edit deploy\config.bat, then re-run.
+    exit /b 1
+  )
+  echo [deploy] Review deploy\config.bat - set infra settings like DOMAIN and the tunnel token, then re-run.
   exit /b 1
 )
 call config.bat

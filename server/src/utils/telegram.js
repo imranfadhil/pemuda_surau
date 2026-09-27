@@ -13,21 +13,27 @@ export function isTelegramConfigured() {
 /**
  * Send a message to a Telegram chat.
  * Returns { ok: true } on success, or { ok: false, error } on failure.
+ *
+ * Pass `options.replyMarkup` to attach a keyboard (e.g. a request_contact
+ * button used to link an account from a verified phone number).
  */
-export async function sendTelegramMessage(chatId, text) {
+export async function sendTelegramMessage(chatId, text, options = {}) {
   if (!isTelegramConfigured()) {
     return { ok: false, error: 'Telegram bot token not configured' };
   }
   try {
+    const body = {
+      chat_id: chatId,
+      text,
+      parse_mode: 'HTML',
+      disable_web_page_preview: true,
+    };
+    if (options.replyMarkup) body.reply_markup = options.replyMarkup;
+
     const res = await fetch(apiUrl('sendMessage'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        chat_id: chatId,
-        text,
-        parse_mode: 'HTML',
-        disable_web_page_preview: true,
-      }),
+      body: JSON.stringify(body),
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok || data.ok === false) {
@@ -107,4 +113,11 @@ export function buildLinkUrl(token) {
   const username = config.telegram.botUsername;
   if (!username) return null;
   return `https://t.me/${username.replace(/^@/, '')}?start=${token}`;
+}
+
+/** Plain deep link to open the bot (used for Telegram-first login). */
+export function buildBotUrl() {
+  const username = config.telegram.botUsername;
+  if (!username) return null;
+  return `https://t.me/${username.replace(/^@/, '')}`;
 }

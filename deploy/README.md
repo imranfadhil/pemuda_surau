@@ -13,14 +13,33 @@ resolve its public IP automatically, push the code, and can destroy everything w
 
 ## Setup
 
-1. Copy the config template and fill it in:
+1. Create `config.bat` — either let the scripts seed it from your `.env`, or copy the
+   template manually:
    ```bat
-   copy config.example.bat config.bat
-   notepad config.bat
+   seed-config.bat          REM generate config.bat, pre-filled from ..\.env
    ```
-2. Set at minimum `CLOUDFLARE_TUNNEL_TOKEN` (for HTTPS) and `DOMAIN` if you have one.
+   `deploy.bat` and `sync.bat` also run this automatically if `config.bat` is missing.
+2. Review `config.bat` and set the infrastructure values that can't come from `.env`
+   (at minimum `CLOUDFLARE_TUNNEL_TOKEN` for HTTPS, and `DOMAIN` if you have one).
 
 `config.bat` is gitignored, so your secrets stay local.
+
+### Seeding from `.env`
+
+`seed-config.bat` reads the project `.env` and pre-fills the matching app-level settings,
+so you don't type them twice:
+
+| `config.bat` | from `.env` |
+| --- | --- |
+| `ADMIN_PHONES` | `ADMIN_PHONES` |
+| `TELEGRAM_BOT_TOKEN` / `TELEGRAM_BOT_USERNAME` / `TELEGRAM_WEBHOOK_SECRET` / `TELEGRAM_MODE` | same names |
+| `OTP_CHANNEL` | `OTP_CHANNEL` |
+| `SMS_PROVIDER` / `SMS_API_KEY` / `SMS_SENDER_ID` | same names |
+| `CLOUDFLARE_TUNNEL_TOKEN` | `CLOUDFLARE_TUNNEL_TOKEN` |
+| `DOMAIN` | derived from `PUBLIC_URL` |
+
+Infrastructure settings (`PROJECT_NAME`, `REGION`, `SIZE`, `IMAGE`, SSH key) keep the
+template defaults. Regenerate at any time with `seed-config.bat -Force`.
 
 ## Scripts
 
@@ -29,6 +48,7 @@ resolve its public IP automatically, push the code, and can destroy everything w
 | `deploy.bat` | Create droplet (if needed) → push code → start stack |
 | `sync.bat` | Push code changes and restart (keeps server `.env`) |
 | `sync.bat --restart` | Push code and force a Docker rebuild |
+| `seed-config.bat` | Generate `config.bat` from `.env` (`-Force` to regenerate) |
 | `destroy.bat` | Delete the droplet and the DO SSH key |
 
 ## Typical workflow
@@ -61,7 +81,8 @@ destroy.bat
 2. Packages the repo (excludes `node_modules`, `.git`, `dist`, `.env`, `deploy`)
 3. Uploads over SSH and extracts to `/opt/pemuda_surau`
 4. Creates `.env` on first deploy and **auto-generates** strong `JWT_SECRET` and
-   `POSTGRES_PASSWORD` values
+   `POSTGRES_PASSWORD` values (generated whenever the line is missing or still a
+   placeholder, so `.env.example` ships without them)
 5. Applies `CLOUDFLARE_TUNNEL_TOKEN`, `CORS_ORIGIN`, `ADMIN_PHONES`, and SMS settings
    from `config.bat`
 6. Runs `docker compose --profile tunnel up -d [--build]` and prints status

@@ -80,7 +80,8 @@ export default function AdminPage() {
             {loginCode.code}
           </div>
           <div className="muted">
-            Read this to {loginCode.fullName} ({loginCode.phone}). It expires in a few minutes.
+            Last resort — read this to {loginCode.fullName} ({loginCode.phone}). It expires in a few
+            minutes. Prefer asking them to link Telegram instead.
           </div>
         </div>
       )}
@@ -119,7 +120,11 @@ export default function AdminPage() {
                 <button
                   className="btn btn-sm btn-secondary"
                   disabled={codeBusy === u.id || !u.phone}
-                  title={u.phone ? undefined : 'Dependents have no phone to log in with'}
+                  title={
+                    u.phone
+                      ? 'Last resort: generate a code to read out if the member cannot use Telegram'
+                      : 'Dependents have no phone to log in with'
+                  }
                   onClick={() => generateCode(u)}
                 >
                   {codeBusy === u.id ? '…' : 'Code'}

@@ -12,7 +12,7 @@ statistics, rankings, and program management.
 ## Features
 
 - 📱 **Phone + OTP login** — no passwords to remember
-- ✈️ **Free Telegram login codes** — no SMS charges, with admin-assisted fallback
+- ✈️ **Free Telegram login codes** — the primary sign-in method, no SMS charges, with admin-assisted fallback as a last resort
 - 👨‍👩‍👧 **Family accounts** — parents can add children (dependents) who have no phone of
   their own, enroll their faces, and check them in for prayers
 - 🧑 **Face enrollment & verification** — runs in the browser (face-api.js); only a 128-value
@@ -59,7 +59,7 @@ statistics, rankings, and program management.
 
 ```bash
 cd server
-cp ../.env.example .env      # then edit DATABASE_URL, JWT_SECRET, etc.
+cp ../.env.example .env      # then edit DATABASE_URL, ADMIN_PHONES, etc.
 npm install
 npm run migrate              # creates tables
 npm run dev                  # http://localhost:4000
@@ -86,7 +86,7 @@ See `.env.example`. Key ones:
 | Variable | Purpose |
 | --- | --- |
 | `DATABASE_URL` | PostgreSQL connection string |
-| `JWT_SECRET` | Long random string for signing tokens |
+| `JWT_SECRET` | Signing key for tokens. Auto-generated on the server by `deploy/sync.bat`; set any value for local dev |
 | `FACE_MATCH_THRESHOLD` | Lower = stricter. `0.5–0.6` recommended |
 | `OTP_CHANNEL` | `telegram` (free), `sms` (paid), or `console` (dev) |
 | `TELEGRAM_BOT_TOKEN` | Bot token from @BotFather |
@@ -101,14 +101,19 @@ See `.env.example`. Key ones:
 
 ## Login codes (OTP delivery)
 
-Login codes can be delivered three ways. The app picks the best available channel per user:
+**Telegram is the primary login method.** The login screen leads with a **Sign in with Telegram**
+button. The user opens the bot, taps **Share my phone number**, and the bot links their account
+and sends a login code straight away — free, instant, and no admin involvement.
 
-1. **Telegram** — free, unlimited. Used when the member has linked their account.
+If a member hasn't linked Telegram yet, the app falls back through these channels:
+
+1. **Telegram** — free, unlimited. Primary channel.
 2. **SMS** — paid (Twilio/Vonage). Used when `OTP_CHANNEL=sms` and a provider is configured.
 3. **Console** — logs the code to the server. Dev only.
 
-If none of the above can reach a member, the login screen tells them to ask an admin, who can
-generate a code from the admin panel and read it out in person.
+**Admin-assisted login is the last resort.** Only when none of the above can reach a member
+does the login screen suggest asking an admin, who can generate a code from the admin panel and
+read it out in person.
 
 ### Setting up Telegram (recommended — free)
 
@@ -126,9 +131,12 @@ generate a code from the admin panel and read it out in person.
      -H "Authorization: Bearer <admin-token>"
    ```
    Or use the admin panel. The webhook must be reachable over **HTTPS**.
-4. Members open **Profile → Link Telegram**, tap the link, and press **Start**.
+4. Members tap **Sign in with Telegram** on the login screen (or **Profile → Link Telegram**),
+   then press **Start** and **Share my phone number**.
 
-Once linked, codes arrive as Telegram messages — no SMS costs.
+Once linked, codes arrive as Telegram messages — no SMS costs. Because the phone number is
+shared through Telegram's verified contact button, a brand-new member can link and log in
+without ever needing an admin.
 
 #### Testing Telegram locally (polling mode)
 
@@ -156,11 +164,12 @@ Telegram allows only one delivery method at a time.
 > **Note:** polling is fine for development but less efficient in production (it holds an
 > open long-poll connection). Keep `webhook` for your deployed server.
 
-### Admin-assisted login
+### Admin-assisted login (last resort)
 
 In **Admin → Members**, each member has a **Code** button. It generates a one-time login code
-and displays it large on screen so the admin can read it to the member. Useful for anyone
-without Telegram or a working phone.
+and displays it large on screen so the admin can read it to the member. This is a **last
+resort** for anyone who cannot use Telegram or a working phone — prefer helping them link
+Telegram instead.
 
 ## Family accounts (children without phones)
 
@@ -208,7 +217,7 @@ curl -fsSL https://get.docker.com | sh
 git clone <your-repo-url> /opt/pemuda_surau
 cd /opt/pemuda_surau
 cp .env.example .env
-nano .env      # set strong POSTGRES_PASSWORD, JWT_SECRET, ADMIN_PHONES, SMS_*
+nano .env      # set strong POSTGRES_PASSWORD, ADMIN_PHONES, SMS_*
 ```
 
 > **Windows users:** the `deploy/` folder has batch scripts that automate the whole
@@ -325,6 +334,7 @@ docker compose up -d --build
 | --- | --- | --- | --- |
 | POST | `/api/auth/request-otp` | – | Send OTP to a phone |
 | POST | `/api/auth/verify-otp` | – | Verify OTP, returns JWT |
+| GET | `/api/auth/login-options` | – | Available login channels (Telegram-first) |
 | GET | `/api/auth/me` | user | Current profile |
 | PUT | `/api/users/me` | user | Update profile |
 | POST | `/api/users/me/face` | user | Enroll face descriptor |
