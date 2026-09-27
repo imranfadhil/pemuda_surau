@@ -48,6 +48,7 @@ template defaults. Regenerate at any time with `seed-config.bat -Force`.
 | `sync.bat` | Push code changes and restart (keeps server `.env`) |
 | `sync.bat --restart` | Push code and force a Docker rebuild |
 | `seed-config.bat` | Generate `config.bat` from `.env` (`-Force` to regenerate) |
+| `backup.bat` | Manage database backups (`--list`, `--restore`, `--logs`) |
 | `destroy.bat` | Delete the droplet and the DO SSH key |
 
 ## Typical workflow
@@ -64,6 +65,18 @@ sync.bat --restart
 
 REM Tear everything down
 destroy.bat
+```
+
+## Backups
+
+The stack runs a `backup` service that takes a nightly `pg_dump` and can upload
+it to Cloudflare R2 (free tier). See **[../backup/README.md](../backup/README.md)**
+for setup and restore instructions.
+
+```bat
+backup.bat              REM take a backup now
+backup.bat --list       REM list local + remote backups
+backup.bat --restore    REM restore the latest backup (DESTRUCTIVE)
 ```
 
 ## What `deploy.bat` does

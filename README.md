@@ -114,6 +114,25 @@ docker compose exec -T -e SIM_TOTAL=70 -e SIM_TEACHERS=6 -e SIM_AJK=10 -e SIM_DA
 > Re-running the seed replaces the previous dummy data (it clears first), so it's safe to run
 > repeatedly. Dummy phones use the `+6019000xxxx` range so they never collide with real numbers.
 
+## Backups
+
+The stack includes a `backup` service that takes a **nightly `pg_dump`** and can upload it to
+**Cloudflare R2** (free tier — 10 GB, no egress fees). A dump of this app is ~0.5 MB, so it
+stays well inside the free allowance.
+
+```bash
+docker compose exec -T backup backup.sh --once    # back up now
+docker compose exec -T backup restore.sh --list   # list backups
+docker compose exec -T backup restore.sh --latest # restore newest (DESTRUCTIVE)
+```
+
+Set `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, and `R2_BUCKET` in `.env` to
+enable offsite copies. Full setup, restore, and disaster-recovery steps are in
+**[backup/README.md](backup/README.md)**.
+
+> **Before go-live:** run one test restore into a scratch database. An untested backup is a
+> hope, not a backup.
+
 ## Environment variables
 
 See `.env.example`. Key ones:
