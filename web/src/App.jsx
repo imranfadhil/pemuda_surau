@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { Routes, Route, Navigate, NavLink, Link, useLocation } from 'react-router-dom';
 import { useAuth } from './lib/auth.jsx';
+import CommunityLink from './components/CommunityLink.jsx';
 import LoginPage from './pages/LoginPage.jsx';
 import RegisterPage from './pages/RegisterPage.jsx';
 import HomePage from './pages/HomePage.jsx';
@@ -63,6 +64,7 @@ function TopBar() {
         <span>Pemuda Surau Al-Abqori</span>
       </Link>
       <div className="topbar-user">
+        <CommunityLink variant="icon" />
         {user ? (
           <>
             <span>{user.fullName}</span>

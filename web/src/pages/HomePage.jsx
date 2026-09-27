@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../lib/api.js';
 import { useAuth } from '../lib/auth.jsx';
+import CommunityLink from '../components/CommunityLink.jsx';
 import { PRAYERS, PRAYER_LABELS, SURAU } from '../lib/constants.js';
 
 function formatClock(iso) {
@@ -61,6 +62,8 @@ export default function HomePage() {
           {SURAU.latitude}° N, {SURAU.longitude}° E — Open in Maps
         </a>
       </div>
+
+      <CommunityLink variant="card" />
 
       {!user?.hasFace && (
         <div className="alert alert-info">

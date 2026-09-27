@@ -291,6 +291,43 @@ textarea:focus {
   font-size: 0.8rem;
 }
 
+/* ---- Community / WhatsApp link ---- */
+
+/* WhatsApp brand green so the call to action is instantly recognisable. */
+.community-btn {
+  background: #25d366;
+  color: #06381a;
+}
+
+.community-btn:hover {
+  background: #1ebe5a;
+}
+
+/* Icon-only button, sized to sit inline with the top-bar controls. */
+.community-icon-btn {
+  font-size: 1rem;
+  line-height: 1;
+  padding: 6px 10px;
+  text-decoration: none;
+}
+
+.community-card-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.community-icon {
+  font-size: 1.6rem;
+  line-height: 1;
+}
+
+.community-text-link {
+  color: var(--teal-700);
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
 /* ---- Forms ---- */
 .field {
   margin-bottom: 16px;
@@ -487,6 +524,62 @@ textarea:focus {
   color: white;
   font-size: 0.85rem;
   text-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
+}
+
+/* ---- Face scan guidance ---- */
+
+/* Camera and tips side by side on wider screens; stacked on phones. */
+.face-enroll-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 260px;
+  gap: 20px;
+  align-items: start;
+}
+
+@media (max-width: 640px) {
+  .face-enroll-grid {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+}
+
+.face-tips {
+  background: var(--teal-50);
+  border: 1px solid var(--teal-100);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+}
+
+.face-tips-title {
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--teal-900);
+  margin-bottom: 8px;
+}
+
+.face-tips ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.face-tips li {
+  font-size: 0.83rem;
+  line-height: 1.35;
+  color: var(--slate-800);
+}
+
+.face-tips li span {
+  margin-right: 4px;
+}
+
+.face-tips.compact {
+  padding: 12px 14px;
 }
 
 /* ---- Programs ---- */
@@ -837,4 +930,126 @@ textarea:focus {
   .kiosk-stats {
     grid-template-columns: repeat(3, 1fr);
   }
+}
+
+/* Slim footer strip on the kiosk: community group QR + label. */
+.kiosk-footer {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 8px 14px;
+  border-radius: var(--radius);
+  background: rgba(255, 255, 255, 0.92);
+  color: var(--slate-900);
+}
+
+.kiosk-footer-text {
+  font-size: 0.95rem;
+}
+
+.kiosk-footer-qr {
+  padding: 4px;
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+
+.kiosk-footer-hint {
+  font-size: 0.8rem;
+  color: var(--slate-600);
+  margin-left: auto;
+}
+
+/* ---- Mobile fallbacks for the public landing page ---- */
+
+/* /display on a phone: nudge the user to log in instead of the wall layout. */
+.kiosk-mobile {
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 32px 20px;
+  text-align: center;
+  background: linear-gradient(160deg, var(--teal-700), var(--teal-900));
+  color: white;
+}
+
+.kiosk-mobile .brand-logo {
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  margin-bottom: 12px;
+}
+
+/* / on a phone: a normal scrolling, mobile-friendly version of the display. */
+.mobile-dashboard {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 20px 16px 40px;
+}
+
+.mobile-dash-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.mobile-dash-head .brand-logo {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+}
+
+.mobile-dash-title {
+  font-size: 1.15rem;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.mobile-dash-sub {
+  font-size: 0.8rem;
+  color: var(--slate-600);
+}
+
+.category-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 12px 0 16px;
+}
+
+.category-pills .pill {
+  cursor: pointer;
+  border: 1px solid transparent;
+  opacity: 0.6;
+}
+
+.category-pills .pill.active {
+  opacity: 1;
+  border-color: var(--teal-600);
+}
+
+.mobile-leader-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+@media (max-width: 520px) {
+  .mobile-leader-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+}
+
+.mobile-leader-grid .kiosk-leader-name {
+  font-size: 0.9rem;
+}
+
+.mobile-leader-grid .kiosk-leader-score {
+  font-size: 1rem;
 }

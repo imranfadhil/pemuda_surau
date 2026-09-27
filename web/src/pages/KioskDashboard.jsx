@@ -5,7 +5,7 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, CartesianGrid,
 } from 'recharts';
 import { api } from '../lib/api.js';
-import { CATEGORIES, badgeFor, SURAU } from '../lib/constants.js';
+import { CATEGORIES, badgeFor, SURAU, COMMUNITY } from '../lib/constants.js';
 import { useIsMobile } from '../lib/device.js';
 
 // How long each leaderboard category stays on screen before rotating.
@@ -78,6 +78,15 @@ function MobileNotice() {
         >
           Log in
         </Link>
+        <a
+          className="community-text-link"
+          style={{ display: 'block', marginTop: 12 }}
+          href={COMMUNITY.whatsappUrl}
+          target="_blank"
+          rel="noreferrer"
+        >
+          💬 Join our {COMMUNITY.label} for program updates
+        </a>
       </div>
     </div>
   );
@@ -180,6 +189,22 @@ function MobileDashboard({ stats, weeklyChart, monthly, yearly, category, catInd
       <p className="center muted" style={{ marginTop: 16 }}>
         <Link to="/login">Log in</Link> to check in and track your own progress.
       </p>
+
+      <div className="card" style={{ textAlign: 'center' }}>
+        <h2 className="card-title">💬 {COMMUNITY.name}</h2>
+        <p className="muted" style={{ margin: '6px 0 12px', fontSize: '0.85rem' }}>
+          {COMMUNITY.description}
+        </p>
+        <a
+          className="btn community-btn"
+          style={{ display: 'block', textAlign: 'center' }}
+          href={COMMUNITY.whatsappUrl}
+          target="_blank"
+          rel="noreferrer"
+        >
+          💬 Join the {COMMUNITY.label}
+        </a>
+      </div>
     </div>
   );
 }
@@ -407,6 +432,17 @@ export default function KioskDashboard({ publicHome = false }) {
           </div>
         </aside>
       </div>
+
+      {/* Slim footer strip: join the community group (QR for phones + text). */}
+      <footer className="kiosk-footer">
+        <span className="kiosk-footer-text">
+          💬 <strong>Join our {COMMUNITY.label}</strong> for program updates & announcements
+        </span>
+        <div className="qr-box kiosk-footer-qr">
+          <QRCodeSVG value={COMMUNITY.whatsappUrl} size={64} level="L" marginSize={0} />
+        </div>
+        <span className="kiosk-footer-hint">Scan with your phone →</span>
+      </footer>
     </div>
   );
 }

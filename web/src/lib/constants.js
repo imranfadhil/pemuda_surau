@@ -6,6 +6,15 @@ export const SURAU = {
   mapsUrl: 'https://www.google.com/maps/search/?api=1&query=2.93276,101.8047',
 };
 
+// Community channel for program updates and announcements (not technical
+// support). Shown in the top bar, on Home and on the kiosk/mobile display.
+export const COMMUNITY = {
+  label: 'WhatsApp group',
+  name: 'Pemuda Surau Al-Abqori',
+  description: 'Program updates, announcements and photos from the surau youth programme.',
+  whatsappUrl: 'https://chat.whatsapp.com/IuGhkTOQ1q9DjxJV4cnFKr',
+};
+
 export const PRAYERS = [
   { key: 'subuh', label: 'Subuh' },
   { key: 'zuhur', label: 'Zuhur' },
