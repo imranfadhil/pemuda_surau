@@ -1,6 +1,5 @@
 import { Routes, Route, Navigate, NavLink, Link, useLocation } from 'react-router-dom';
 import { useAuth } from './lib/auth.jsx';
-import { can } from './lib/constants.js';
 import LoginPage from './pages/LoginPage.jsx';
 import RegisterPage from './pages/RegisterPage.jsx';
 import HomePage from './pages/HomePage.jsx';
@@ -11,6 +10,8 @@ import ProgramsPage from './pages/ProgramsPage.jsx';
 import ProfilePage from './pages/ProfilePage.jsx';
 import DependentPage from './pages/DependentPage.jsx';
 import AdminPage from './pages/AdminPage.jsx';
+import QuranPage from './pages/QuranPage.jsx';
+import MeritsPage from './pages/MeritsPage.jsx';
 
 function BottomNav() {
   const { user } = useAuth();
@@ -19,7 +20,8 @@ function BottomNav() {
         { to: '/', label: 'Dashboard', icon: '🏆' },
         { to: '/home', label: 'Home', icon: '🏠' },
         { to: '/check-in', label: 'Check-in', icon: '🕌' },
-        { to: '/programs', label: 'Programs', icon: '📅' },
+        { to: '/quran', label: 'Quran', icon: '📖' },
+        { to: '/merits', label: 'Merits', icon: '🏅' },
         { to: '/profile', label: 'Profile', icon: '👤' },
       ]
     : [
@@ -28,8 +30,6 @@ function BottomNav() {
       ];
   if (user?.role === 'admin') {
     items.push({ to: '/admin', label: 'Admin', icon: '⚙️' });
-  } else if (can(user, 'manageMerits') || can(user, 'manageQuran')) {
-    items.push({ to: '/admin', label: 'Staff', icon: '🧑‍🏫' });
   }
   return (
     <nav className="bottom-nav">
@@ -79,7 +79,7 @@ function Protected({ children }) {
 
 function AdminOnly({ children }) {
   const { user } = useAuth();
-  if (!can(user, 'manageMerits') && !can(user, 'manageQuran') && user?.role !== 'admin') {
+  if (user?.role !== 'admin') {
     return <Navigate to="/" replace />;
   }
   return children;
@@ -117,6 +117,22 @@ export default function App() {
                     element={
                       <Protected>
                         <CheckInPage />
+                      </Protected>
+                    }
+                  />
+                  <Route
+                    path="/quran"
+                    element={
+                      <Protected>
+                        <QuranPage />
+                      </Protected>
+                    }
+                  />
+                  <Route
+                    path="/merits"
+                    element={
+                      <Protected>
+                        <MeritsPage />
                       </Protected>
                     }
                   />

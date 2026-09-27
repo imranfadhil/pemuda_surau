@@ -1,0 +1,300 @@
+import { useEffect, useState } from 'react';
+import { api } from '../lib/api.js';
+import { useAuth } from '../lib/auth.jsx';
+import FaceScan from '../components/FaceScan.jsx';
+import { formatDate, can } from '../lib/constants.js';
+
+/**
+ * Quran activity page.
+ *
+ * - Members log their own recitation/memorization.
+ * - Teachers (and admins) can scan a youth's face at the surau and record on
+ *   their behalf; the record stores who submitted it.
+ */
+export default function QuranPage() {
+  const { user } = useAuth();
+  const canManage = can(user, 'manageQuran');
+  const canIdentify = can(user, 'identifyMembers');
+
+  const [mine, setMine] = useState({ recitation: 0, memorization: 0, logs: [] });
+  const [members, setMembers] = useState([]);
+  const [recent, setRecent] = useState([]);
+  const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [scanOpen, setScanOpen] = useState(false);
+  const [proof, setProof] = useState(null);
+
+  const [form, setForm] = useState({
+    userId: '',
+    kind: 'recitation',
+    surah: '',
+    juz: '',
+    pages: '',
+    note: '',
+  });
+
+  function loadMine() {
+    api.myQuran().then(setMine).catch((e) => setError(e.message));
+  }
+
+  function loadRecent() {
+    if (!canManage) return;
+    api.listQuran().then((d) => setRecent(d.logs)).catch((e) => setError(e.message));
+  }
+
+  useEffect(() => {
+    loadMine();
+    loadRecent();
+    if (canManage) {
+      api.listUsers().then((d) => setMembers(d.users)).catch(() => {});
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const recordingForOther = canManage && form.userId && form.userId !== user?.id;
+
+  async function submit(e) {
+    e.preventDefault();
+    setError('');
+    setNotice('');
+    setBusy(true);
+    try {
+      await api.logQuran({
+        forUserId: form.userId || undefined,
+        kind: form.kind,
+        surah: form.surah || null,
+        juz: form.juz ? Number(form.juz) : null,
+        pages: form.pages ? Number(form.pages) : null,
+        note: form.note || null,
+        ...(proof || {}),
+      });
+      setNotice('Quran activity recorded.');
+      setForm({ userId: '', kind: form.kind, surah: '', juz: '', pages: '', note: '' });
+      setProof(null);
+      loadMine();
+      loadRecent();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function remove(id) {
+    setError('');
+    try {
+      await api.deleteQuran(id);
+      loadMine();
+      loadRecent();
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
+  function onScanConfirmed({ member, descriptor, latitude, longitude }) {
+    setProof({ descriptor, latitude, longitude });
+    setForm((f) => ({ ...f, userId: member.id }));
+    setScanOpen(false);
+    setNotice(`Scanned ${member.fullName}. Complete the form to record.`);
+  }
+
+  const selectedName = members.find((m) => m.id === form.userId)?.fullName;
+
+  return (
+    <div>
+      <h1 className="page-title">📖 Quran activity</h1>
+      <p className="page-sub">
+        {canManage
+          ? 'Record recitation and memorization for members at the surau.'
+          : 'Log your recitation and memorization to earn badges.'}
+      </p>
+
+      {error && <div className="alert alert-error">{error}</div>}
+      {notice && <div className="alert alert-success">{notice}</div>}
+
+      <div className="stat-grid">
+        <div className="stat">
+          <div className="value">{mine.recitation}</div>
+          <div className="label">📖 My recitations</div>
+        </div>
+        <div className="stat">
+          <div className="value">{mine.memorization}</div>
+          <div className="label">🧠 My memorizations</div>
+        </div>
+      </div>
+
+      {scanOpen && (
+        <FaceScan onConfirmed={onScanConfirmed} onCancel={() => setScanOpen(false)} />
+      )}
+
+      <form className="card" onSubmit={submit}>
+        <h2 className="card-title">Record activity</h2>
+
+        {canManage && (
+          <>
+            <p className="muted" style={{ marginBottom: 12 }}>
+              Scan the member's face at the surau, then record their activity.
+            </p>
+            {canIdentify && (
+              <button
+                type="button"
+                className="btn btn-secondary btn-block"
+                style={{ marginBottom: 12 }}
+                onClick={() => setScanOpen(true)}
+              >
+                📷 Scan member's face
+              </button>
+            )}
+            {proof && (
+              <div className="alert alert-success">
+                ✅ Face verified for <strong>{selectedName || 'member'}</strong>
+              </div>
+            )}
+            <div className="field">
+              <label>Member</label>
+              <select
+                value={form.userId}
+                onChange={(e) => {
+                  setForm({ ...form, userId: e.target.value });
+                  setProof(null);
+                }}
+              >
+                <option value="">Myself ({user?.fullName})</option>
+                {members
+                  .filter((m) => m.id !== user?.id)
+                  .map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.fullName} {m.isDependent ? '(child)' : ''}
+                    </option>
+                  ))}
+              </select>
+            </div>
+          </>
+        )}
+
+        <div className="row">
+          <div className="field" style={{ flex: 1 }}>
+            <label>Type</label>
+            <select value={form.kind} onChange={(e) => setForm({ ...form, kind: e.target.value })}>
+              <option value="recitation">Recitation</option>
+              <option value="memorization">Memorization</option>
+            </select>
+          </div>
+          <div className="field" style={{ flex: 1 }}>
+            <label>Surah (optional)</label>
+            <input
+              type="text"
+              placeholder="e.g. Al-Kahf"
+              value={form.surah}
+              onChange={(e) => setForm({ ...form, surah: e.target.value })}
+            />
+          </div>
+        </div>
+
+        <div className="row">
+          <div className="field" style={{ flex: 1 }}>
+            <label>Juz (optional)</label>
+            <input
+              type="number"
+              min="1"
+              max="30"
+              value={form.juz}
+              onChange={(e) => setForm({ ...form, juz: e.target.value })}
+            />
+          </div>
+          <div className="field" style={{ flex: 1 }}>
+            <label>Pages (optional)</label>
+            <input
+              type="number"
+              min="1"
+              value={form.pages}
+              onChange={(e) => setForm({ ...form, pages: e.target.value })}
+            />
+          </div>
+        </div>
+
+        <div className="field">
+          <label>Note (optional)</label>
+          <input
+            type="text"
+            placeholder="Anything to remember"
+            value={form.note}
+            onChange={(e) => setForm({ ...form, note: e.target.value })}
+          />
+        </div>
+
+        {recordingForOther && !proof && (
+          <div className="alert alert-info">
+            Recording for <strong>{selectedName}</strong> requires a face scan at the surau.
+          </div>
+        )}
+
+        <button className="btn btn-block" disabled={busy}>
+          {busy ? 'Saving…' : 'Log activity'}
+        </button>
+      </form>
+
+      <div className="card">
+        <h2 className="card-title">My recent activity</h2>
+        {mine.logs.length === 0 ? (
+          <p className="muted">No activity logged yet.</p>
+        ) : (
+          mine.logs.slice(0, 10).map((log) => (
+            <div key={log.id} className="leader-row">
+              <div className="rank-badge" style={{ background: 'var(--teal-100)', color: 'var(--teal-900)' }}>
+                {log.kind === 'recitation' ? '📖' : '🧠'}
+              </div>
+              <div className="leader-name">
+                {log.kind === 'recitation' ? 'Recitation' : 'Memorization'}
+                <div className="muted" style={{ fontWeight: 400 }}>
+                  {[log.surah, log.juz ? `Juz ${log.juz}` : null, log.pages ? `${log.pages} pages` : null]
+                    .filter(Boolean)
+                    .join(' · ') || '—'}
+                  {' · '}
+                  {formatDate(log.logged_date)}
+                  {log.logged_by_name ? ` · recorded by ${log.logged_by_name}` : ''}
+                </div>
+              </div>
+              <button className="btn btn-sm btn-secondary" onClick={() => remove(log.id)}>
+                Delete
+              </button>
+            </div>
+          ))
+        )}
+      </div>
+
+      {canManage && (
+        <div className="card">
+          <h2 className="card-title">Recent activity (all members)</h2>
+          {recent.length === 0 ? (
+            <p className="muted">No Quran activity recorded yet.</p>
+          ) : (
+            recent.slice(0, 20).map((log) => (
+              <div key={log.id} className="leader-row">
+                <div className="rank-badge" style={{ background: 'var(--teal-100)', color: 'var(--teal-900)' }}>
+                  {log.kind === 'recitation' ? '📖' : '🧠'}
+                </div>
+                <div className="leader-name">
+                  {log.full_name}
+                  <div className="muted" style={{ fontWeight: 400 }}>
+                    {log.kind === 'recitation' ? 'Recitation' : 'Memorization'}
+                    {log.surah ? ` · ${log.surah}` : ''}
+                    {' · '}
+                    {formatDate(log.logged_date)}
+                    {log.logged_by_name
+                      ? ` · recorded by ${log.logged_by_name}`
+                      : ' · self-logged'}
+                  </div>
+                </div>
+                <button className="btn btn-sm btn-secondary" onClick={() => remove(log.id)}>
+                  Delete
+                </button>
+              </div>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
+}

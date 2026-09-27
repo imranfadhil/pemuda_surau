@@ -200,8 +200,11 @@ router.get(
   requireAuth,
   asyncHandler(async (req, res) => {
     const { rows } = await query(
-      `SELECT * FROM quran_logs WHERE user_id = $1
-       ORDER BY logged_date DESC, logged_at DESC LIMIT 100`,
+      `SELECT q.*, l.full_name AS logged_by_name
+       FROM quran_logs q
+       LEFT JOIN users l ON l.id = q.logged_by
+       WHERE q.user_id = $1
+       ORDER BY q.logged_date DESC, q.logged_at DESC LIMIT 100`,
       [req.user.sub],
     );
     const recitation = rows.filter((r) => r.kind === 'recitation').length;
@@ -217,9 +220,10 @@ router.get(
   requireCapability('manageQuran'),
   asyncHandler(async (req, res) => {
     const { rows } = await query(
-      `SELECT q.*, u.full_name
+      `SELECT q.*, u.full_name, l.full_name AS logged_by_name
        FROM quran_logs q
        JOIN users u ON u.id = q.user_id
+       LEFT JOIN users l ON l.id = q.logged_by
        ORDER BY q.logged_date DESC, q.logged_at DESC
        LIMIT 100`,
     );
@@ -252,9 +256,19 @@ router.post(
     }
 
     const { rows } = await query(
-      `INSERT INTO quran_logs (user_id, kind, surah, juz, pages, note, logged_date)
-       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
-      [targetUserId, kind, surah ?? null, juz ?? null, pages ?? null, note ?? null, todayInTimezone()],
+      `INSERT INTO quran_logs (user_id, kind, surah, juz, pages, note, logged_by, logged_date)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
+      [
+        targetUserId,
+        kind,
+        surah ?? null,
+        juz ?? null,
+        pages ?? null,
+        note ?? null,
+        // NULL when the member logged it themselves.
+        targetUserId === req.user.sub ? null : req.user.sub,
+        todayInTimezone(),
+      ],
     );
     res.status(201).json({ log: rows[0] });
   }),

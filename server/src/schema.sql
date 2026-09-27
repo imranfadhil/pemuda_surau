@@ -124,6 +124,8 @@ CREATE TABLE IF NOT EXISTS quran_logs (
   juz         INT,
   pages       INT,
   note        TEXT,
+  -- Who submitted the record. NULL means the member logged it themselves.
+  logged_by   UUID REFERENCES users(id) ON DELETE SET NULL,
   logged_date DATE NOT NULL DEFAULT CURRENT_DATE,
   logged_at   TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -174,3 +176,7 @@ ALTER TABLE merits ADD CONSTRAINT merits_awarded_by_fkey
 ALTER TABLE programs DROP CONSTRAINT IF EXISTS programs_created_by_fkey;
 ALTER TABLE programs ADD CONSTRAINT programs_created_by_fkey
   FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL;
+
+-- Record who submitted each Quran log (NULL = the member logged it themselves).
+ALTER TABLE quran_logs ADD COLUMN IF NOT EXISTS logged_by UUID REFERENCES users(id) ON DELETE SET NULL;
+CREATE INDEX IF NOT EXISTS idx_quran_logged_by ON quran_logs (logged_by) WHERE logged_by IS NOT NULL;

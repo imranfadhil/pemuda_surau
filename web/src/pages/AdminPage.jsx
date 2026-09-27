@@ -1,20 +1,22 @@
 import { useEffect, useState } from 'react';
 import { api } from '../lib/api.js';
 import { useAuth } from '../lib/auth.jsx';
-import FaceScan from '../components/FaceScan.jsx';
 import {
   PRAYERS, PRAYER_LABELS, todayISO, formatDate, ROLES, ROLE_LABELS, can,
 } from '../lib/constants.js';
 
+/**
+ * Admin / Staff page.
+ *
+ * Quran and Merits now have their own tabs in the bottom nav, so this page
+ * covers member management and attendance only.
+ */
 export default function AdminPage() {
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
-  const canMerits = can(user, 'manageMerits');
-  const canQuran = can(user, 'manageQuran');
   const canAttendance = can(user, 'manageAttendance');
-  const canIdentify = can(user, 'identifyMembers');
 
-  const [tab, setTab] = useState(isAdmin ? 'members' : canQuran ? 'quran' : 'merits');
+  const [tab, setTab] = useState(isAdmin ? 'members' : 'attendance');
   const [users, setUsers] = useState([]);
   const [date, setDate] = useState(todayISO());
   const [dayAttendance, setDayAttendance] = useState([]);
@@ -23,15 +25,6 @@ export default function AdminPage() {
   const [notice, setNotice] = useState('');
   const [loginCode, setLoginCode] = useState(null);
   const [codeBusy, setCodeBusy] = useState('');
-  const [merits, setMerits] = useState([]);
-  const [meritForm, setMeritForm] = useState({ userId: '', points: 5, reason: '' });
-  const [quranLogs, setQuranLogs] = useState([]);
-  const [quranForm, setQuranForm] = useState({
-    userId: '', kind: 'recitation', surah: '', juz: '', pages: '', note: '',
-  });
-  // Face-scan flow: which form the scan is filling in, plus the verified proof.
-  const [scanFor, setScanFor] = useState(null); // 'quran' | 'merits' | null
-  const [proof, setProof] = useState(null); // { descriptor, latitude, longitude }
 
   function loadUsers() {
     api.listUsers().then((d) => setUsers(d.users)).catch((e) => setError(e.message));
@@ -41,22 +34,10 @@ export default function AdminPage() {
     api.attendanceByDate(date).then((d) => setDayAttendance(d.attendance)).catch((e) => setError(e.message));
   }
 
-  function loadMerits() {
-    api.listMerits().then((d) => setMerits(d.merits)).catch((e) => setError(e.message));
-  }
-
-  function loadQuran() {
-    api.listQuran().then((d) => setQuranLogs(d.logs)).catch((e) => setError(e.message));
-  }
-
   useEffect(loadUsers, []);
   useEffect(() => {
     if (canAttendance) loadDay();
   }, [date, canAttendance]);
-  useEffect(() => {
-    if (tab === 'merits') loadMerits();
-    if (tab === 'quran') loadQuran();
-  }, [tab]);
 
   async function toggleActive(user) {
     try {
@@ -106,83 +87,6 @@ export default function AdminPage() {
     }
   }
 
-  async function submitMerit(e) {
-    e.preventDefault();
-    setError('');
-    setNotice('');
-    try {
-      await api.awardMerit({
-        userId: meritForm.userId,
-        points: Number(meritForm.points),
-        reason: meritForm.reason,
-        ...(proof || {}),
-      });
-      setNotice('Merit awarded.');
-      setMeritForm({ userId: '', points: 5, reason: '' });
-      setProof(null);
-      loadMerits();
-    } catch (err) {
-      setError(err.message);
-    }
-  }
-
-  async function revokeMerit(id) {
-    setError('');
-    try {
-      await api.deleteMerit(id);
-      loadMerits();
-    } catch (err) {
-      setError(err.message);
-    }
-  }
-
-  async function submitQuran(e) {
-    e.preventDefault();
-    setError('');
-    setNotice('');
-    try {
-      await api.logQuran({
-        forUserId: quranForm.userId,
-        kind: quranForm.kind,
-        surah: quranForm.surah || null,
-        juz: quranForm.juz ? Number(quranForm.juz) : null,
-        pages: quranForm.pages ? Number(quranForm.pages) : null,
-        note: quranForm.note || null,
-        ...(proof || {}),
-      });
-      setNotice('Quran activity recorded.');
-      setQuranForm({ userId: '', kind: quranForm.kind, surah: '', juz: '', pages: '', note: '' });
-      setProof(null);
-      loadQuran();
-    } catch (err) {
-      setError(err.message);
-    }
-  }
-
-  /** Called when the staff member confirms the scanned face. */
-  function onScanConfirmed({ member, descriptor, latitude, longitude }) {
-    setProof({ descriptor, latitude, longitude });
-    if (scanFor === 'quran') {
-      setQuranForm((f) => ({ ...f, userId: member.id }));
-    } else if (scanFor === 'merits') {
-      setMeritForm((f) => ({ ...f, userId: member.id }));
-    }
-    setScanFor(null);
-    setNotice(`Scanned ${member.fullName}. Complete the form to record.`);
-  }
-
-  async function removeQuran(id) {
-    setError('');
-    try {
-      await api.deleteQuran(id);
-      loadQuran();
-    } catch (err) {
-      setError(err.message);
-    }
-  }
-
-  const memberOptions = users.filter((u) => !u.isDependent);
-
   return (
     <div>
       <h1 className="page-title">{isAdmin ? 'Admin' : 'Staff'}</h1>
@@ -227,16 +131,6 @@ export default function AdminPage() {
         {canAttendance && (
           <button className={`tab ${tab === 'manual' ? 'active' : ''}`} onClick={() => setTab('manual')}>
             Manual check-in
-          </button>
-        )}
-        {canQuran && (
-          <button className={`tab ${tab === 'quran' ? 'active' : ''}`} onClick={() => setTab('quran')}>
-            Quran
-          </button>
-        )}
-        {canMerits && (
-          <button className={`tab ${tab === 'merits' ? 'active' : ''}`} onClick={() => setTab('merits')}>
-            Merits
           </button>
         )}
       </div>
@@ -379,234 +273,6 @@ export default function AdminPage() {
           </div>
           <button className="btn btn-block">Record check-in</button>
         </form>
-      )}
-
-      {tab === 'quran' && canQuran && (
-        <>
-          {scanFor === 'quran' && (
-            <FaceScan onConfirmed={onScanConfirmed} onCancel={() => setScanFor(null)} />
-          )}
-
-          <form className="card" onSubmit={submitQuran}>
-            <h2 className="card-title">📖 Record Quran activity</h2>
-            <p className="muted" style={{ marginBottom: 12 }}>
-              Scan the member's face at the surau, then record their recitation or memorization.
-            </p>
-
-            {canIdentify && (
-              <button
-                type="button"
-                className="btn btn-secondary btn-block"
-                style={{ marginBottom: 12 }}
-                onClick={() => setScanFor('quran')}
-              >
-                📷 Scan member's face
-              </button>
-            )}
-
-            {proof && (
-              <div className="alert alert-success">
-                ✅ Face verified for{' '}
-                <strong>
-                  {memberOptions.find((u) => u.id === quranForm.userId)?.fullName || 'member'}
-                </strong>
-              </div>
-            )}
-
-            <div className="field">
-              <label>Member</label>
-              <select
-                value={quranForm.userId}
-                onChange={(e) => {
-                  setQuranForm({ ...quranForm, userId: e.target.value });
-                  setProof(null);
-                }}
-                required
-              >
-                <option value="">Select member…</option>
-                {memberOptions.map((u) => (
-                  <option key={u.id} value={u.id}>
-                    {u.fullName} {u.phone ? `(${u.phone})` : ''}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="row">
-              <div className="field" style={{ flex: 1 }}>
-                <label>Type</label>
-                <select
-                  value={quranForm.kind}
-                  onChange={(e) => setQuranForm({ ...quranForm, kind: e.target.value })}
-                >
-                  <option value="recitation">Recitation</option>
-                  <option value="memorization">Memorization</option>
-                </select>
-              </div>
-              <div className="field" style={{ flex: 1 }}>
-                <label>Surah (optional)</label>
-                <input
-                  type="text"
-                  placeholder="e.g. Al-Kahf"
-                  value={quranForm.surah}
-                  onChange={(e) => setQuranForm({ ...quranForm, surah: e.target.value })}
-                />
-              </div>
-            </div>
-            <div className="row">
-              <div className="field" style={{ flex: 1 }}>
-                <label>Juz (optional)</label>
-                <input
-                  type="number"
-                  min="1"
-                  max="30"
-                  value={quranForm.juz}
-                  onChange={(e) => setQuranForm({ ...quranForm, juz: e.target.value })}
-                />
-              </div>
-              <div className="field" style={{ flex: 1 }}>
-                <label>Pages (optional)</label>
-                <input
-                  type="number"
-                  min="1"
-                  value={quranForm.pages}
-                  onChange={(e) => setQuranForm({ ...quranForm, pages: e.target.value })}
-                />
-              </div>
-            </div>
-            <button className="btn btn-block">Record activity</button>
-          </form>
-
-          <div className="card">
-            <h2 className="card-title">Recent Quran activity</h2>
-            {quranLogs.length === 0 ? (
-              <p className="muted">No Quran activity recorded yet.</p>
-            ) : (
-              quranLogs.map((log) => (
-                <div key={log.id} className="leader-row">
-                  <div className="rank-badge" style={{ background: 'var(--teal-100)', color: 'var(--teal-900)' }}>
-                    {log.kind === 'recitation' ? '📖' : '🧠'}
-                  </div>
-                  <div className="leader-name">
-                    {log.full_name}
-                    <div className="muted" style={{ fontWeight: 400 }}>
-                      {log.kind === 'recitation' ? 'Recitation' : 'Memorization'}
-                      {log.surah ? ` · ${log.surah}` : ''}
-                      {log.juz ? ` · Juz ${log.juz}` : ''}
-                      {' · '}
-                      {formatDate(log.logged_date)}
-                    </div>
-                  </div>
-                  <button className="btn btn-sm btn-secondary" onClick={() => removeQuran(log.id)}>
-                    Delete
-                  </button>
-                </div>
-              ))
-            )}
-          </div>
-        </>
-      )}
-
-      {tab === 'merits' && canMerits && (
-        <>
-          {scanFor === 'merits' && (
-            <FaceScan onConfirmed={onScanConfirmed} onCancel={() => setScanFor(null)} />
-          )}
-
-          <form className="card" onSubmit={submitMerit}>
-            <h2 className="card-title">🏅 Award merits</h2>
-            <p className="muted" style={{ marginBottom: 12 }}>
-              Scan the member's face at the surau, then award points for good behaviour.
-            </p>
-
-            {canIdentify && (
-              <button
-                type="button"
-                className="btn btn-secondary btn-block"
-                style={{ marginBottom: 12 }}
-                onClick={() => setScanFor('merits')}
-              >
-                📷 Scan member's face
-              </button>
-            )}
-
-            {proof && (
-              <div className="alert alert-success">
-                ✅ Face verified for{' '}
-                <strong>
-                  {users.find((u) => u.id === meritForm.userId)?.fullName || 'member'}
-                </strong>
-              </div>
-            )}
-
-            <div className="field">
-              <label>Member</label>
-              <select
-                value={meritForm.userId}
-                onChange={(e) => {
-                  setMeritForm({ ...meritForm, userId: e.target.value });
-                  setProof(null);
-                }}
-                required
-              >
-                <option value="">Select member…</option>
-                {users.map((u) => (
-                  <option key={u.id} value={u.id}>
-                    {u.fullName} {u.phone ? `(${u.phone})` : '(dependent)'}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="row">
-              <div className="field" style={{ flex: 1 }}>
-                <label>Points</label>
-                <input
-                  type="number"
-                  min="1"
-                  max="100"
-                  value={meritForm.points}
-                  onChange={(e) => setMeritForm({ ...meritForm, points: e.target.value })}
-                  required
-                />
-              </div>
-              <div className="field" style={{ flex: 2 }}>
-                <label>Reason</label>
-                <input
-                  type="text"
-                  placeholder="e.g. Helped clean the surau"
-                  value={meritForm.reason}
-                  onChange={(e) => setMeritForm({ ...meritForm, reason: e.target.value })}
-                  required
-                />
-              </div>
-            </div>
-            <button className="btn btn-block">Award merit</button>
-          </form>
-
-          <div className="card">
-            <h2 className="card-title">Recent awards</h2>
-            {merits.length === 0 ? (
-              <p className="muted">No merits awarded yet.</p>
-            ) : (
-              merits.map((m) => (
-                <div key={m.id} className="leader-row">
-                  <div className="rank-badge" style={{ background: 'var(--amber-400)', color: '#78350f' }}>
-                    +{m.points}
-                  </div>
-                  <div className="leader-name">
-                    {m.full_name}
-                    <div className="muted" style={{ fontWeight: 400 }}>
-                      {m.reason} · {formatDate(m.awarded_at)}
-                      {m.awarded_by_name ? ` · by ${m.awarded_by_name}` : ''}
-                    </div>
-                  </div>
-                  <button className="btn btn-sm btn-secondary" onClick={() => revokeMerit(m.id)}>
-                    Revoke
-                  </button>
-                </div>
-              ))
-            )}
-          </div>
-        </>
       )}
     </div>
   );
