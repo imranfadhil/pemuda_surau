@@ -1,0 +1,81 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-surau}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-surau_password}
+      POSTGRES_DB: ${POSTGRES_DB:-pemuda_surau}
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-surau} -d ${POSTGRES_DB:-pemuda_surau}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - surau
+
+  api:
+    build:
+      context: ./server
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 4000
+      DATABASE_URL: postgres://${POSTGRES_USER:-surau}:${POSTGRES_PASSWORD:-surau_password}@db:5432/${POSTGRES_DB:-pemuda_surau}
+      JWT_SECRET: ${JWT_SECRET:-change_me_in_production}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-30d}
+      FACE_MATCH_THRESHOLD: ${FACE_MATCH_THRESHOLD:-0.55}
+      OTP_TTL_MINUTES: ${OTP_TTL_MINUTES:-5}
+      OTP_CHANNEL: ${OTP_CHANNEL:-telegram}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_BOT_USERNAME: ${TELEGRAM_BOT_USERNAME:-}
+      TELEGRAM_WEBHOOK_SECRET: ${TELEGRAM_WEBHOOK_SECRET:-}
+      TELEGRAM_MODE: ${TELEGRAM_MODE:-webhook}
+      TELEGRAM_POLL_TIMEOUT: ${TELEGRAM_POLL_TIMEOUT:-30}
+      PUBLIC_URL: ${PUBLIC_URL:-}
+      SMS_PROVIDER: ${SMS_PROVIDER:-console}
+      SMS_API_KEY: ${SMS_API_KEY:-}
+      SMS_SENDER_ID: ${SMS_SENDER_ID:-}
+      ADMIN_PHONES: ${ADMIN_PHONES:-}
+      CORS_ORIGIN: ${CORS_ORIGIN:-*}
+    networks:
+      - surau
+
+  web:
+    build:
+      context: ./web
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-/api}
+    restart: unless-stopped
+    depends_on:
+      - api
+    # Bound to localhost only: public access goes through the Cloudflare Tunnel.
+    # Set WEB_BIND=0.0.0.0 to expose directly (not recommended).
+    ports:
+      - "${WEB_BIND:-127.0.0.1}:${WEB_PORT:-8080}:80"
+    networks:
+      - surau
+
+    # Cloudflare Tunnel — provides HTTPS without opening inbound ports.
+  # Enable with:  docker compose --profile tunnel up -d
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    profiles: ["tunnel"]
+    depends_on:
+      - web
+    command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN}
+    networks:
+      - surau
+
+volumes:
+  db_data:
+
+networks:
+  surau:
+    driver: bridge
