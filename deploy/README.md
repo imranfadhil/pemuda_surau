@@ -20,7 +20,7 @@ resolve its public IP automatically, push the code, and can destroy everything w
    ```
    `deploy.bat` and `sync.bat` also run this automatically if `config.bat` is missing.
 2. Review `config.bat` and set the infrastructure values that can't come from `.env`
-   (at minimum `CLOUDFLARE_TUNNEL_TOKEN` for HTTPS, and `DOMAIN` if you have one).
+   (at minimum `ADMIN_PHONES`, and `DOMAIN` if you have one).
 
 `config.bat` is gitignored, so your secrets stay local.
 
@@ -32,10 +32,9 @@ so you don't type them twice:
 | `config.bat` | from `.env` |
 | --- | --- |
 | `ADMIN_PHONES` | `ADMIN_PHONES` |
-| `TELEGRAM_BOT_TOKEN` / `TELEGRAM_BOT_USERNAME` / `TELEGRAM_WEBHOOK_SECRET` / `TELEGRAM_MODE` | same names |
+| `TELEGRAM_BOT_TOKEN` / `TELEGRAM_BOT_USERNAME` | same names |
 | `OTP_CHANNEL` | `OTP_CHANNEL` |
 | `SMS_PROVIDER` / `SMS_API_KEY` / `SMS_SENDER_ID` | same names |
-| `CLOUDFLARE_TUNNEL_TOKEN` | `CLOUDFLARE_TUNNEL_TOKEN` |
 | `DOMAIN` | derived from `PUBLIC_URL` |
 
 Infrastructure settings (`PROJECT_NAME`, `REGION`, `SIZE`, `IMAGE`, SSH key) keep the
@@ -83,21 +82,27 @@ destroy.bat
 4. Creates `.env` on first deploy and **auto-generates** strong `JWT_SECRET` and
    `POSTGRES_PASSWORD` values (generated whenever the line is missing or still a
    placeholder, so `.env.example` ships without them)
-5. Applies `CLOUDFLARE_TUNNEL_TOKEN`, `CORS_ORIGIN`, `ADMIN_PHONES`, and SMS settings
-   from `config.bat`
-6. Runs `docker compose --profile tunnel up -d [--build]` and prints status
+5. Applies `CORS_ORIGIN`, `ADMIN_PHONES`, and SMS settings from `config.bat`
+6. Runs `docker compose up -d [--build]`, then reads the quick-tunnel URL from the
+   `quicktunnel` logs and prints it
 
 > Secrets are generated on the server and never overwritten on later syncs, so your data
 > and sessions stay intact across deploys.
 
-## HTTPS via Cloudflare Tunnel
+## HTTPS via Cloudflare Quick Tunnel
 
-Set `CLOUDFLARE_TUNNEL_TOKEN` in `config.bat` (create a named tunnel at
-**Zero Trust → Networks → Tunnels → Create a tunnel**, with a public hostname pointing to
-service `HTTP` / `web:80`). `sync.bat` writes the token into the server `.env`, so the
-tunnel starts automatically and gives you a stable HTTPS URL.
+The stack always runs a **Cloudflare Quick Tunnel** (`quicktunnel` service in
+`docker-compose.yml`). It runs `cloudflared tunnel --url http://web:80`, which prints a
+random `https://<words>.trycloudflare.com` URL. No Cloudflare account, domain, or token is
+needed, and `sync.bat` reads the URL from the container logs and prints it when the deploy
+finishes.
 
-Set `COMPOSE_PROFILE=` (blank) to deploy without the tunnel.
+Caveats: the URL is **random and changes every time the tunnel restarts**, and it is
+intended for testing/demos rather than production. Telegram uses **long-polling**, so OTP
+delivery keeps working regardless of the URL — no webhook re-registration needed.
+
+> Want a stable URL later? Add a named Cloudflare Tunnel (token + domain) as a separate
+> service and point its public hostname at `HTTP` / `web:80`.
 
 ## Configuration reference
 
@@ -109,13 +114,10 @@ Set `COMPOSE_PROFILE=` (blank) to deploy without the tunnel.
 | `SIZE` | `s-1vcpu-2gb` default; `s-1vcpu-1gb` to save cost |
 | `IMAGE` | `docker-20-04` (Docker + Compose preinstalled) |
 | `DOMAIN` | Public domain (used for CORS + shown after deploy) |
-| `CLOUDFLARE_TUNNEL_TOKEN` | Token for the named Cloudflare Tunnel |
 | `ADMIN_PHONES` | Phones that become admins on first login |
 | `OTP_CHANNEL` | `telegram` (free), `sms` (paid), or `console` |
 | `TELEGRAM_BOT_TOKEN` / `TELEGRAM_BOT_USERNAME` | Telegram bot credentials |
-| `TELEGRAM_WEBHOOK_SECRET` | Optional webhook secret |
 | `SMS_PROVIDER` / `SMS_API_KEY` / `SMS_SENDER_ID` | SMS settings (only when `OTP_CHANNEL=sms`) |
-| `COMPOSE_PROFILE` | `tunnel` to start the tunnel, blank to skip |
 
 ## Troubleshooting
 
@@ -129,8 +131,8 @@ Set `COMPOSE_PROFILE=` (blank) to deploy without the tunnel.
 - Wait a minute and run `sync.bat --restart`
 
 **Tunnel not starting**
-- Confirm `CLOUDFLARE_TUNNEL_TOKEN` is set in `config.bat`
-- Check logs: `ssh -i %KEY_FILE% root@<ip> "cd /opt/pemuda_surau && docker compose logs cloudflared"`
+- Check logs: `ssh -i %KEY_FILE% root@<ip> "cd /opt/pemuda_surau && docker compose logs quicktunnel"`
+- The quick tunnel needs outbound internet access; no inbound ports are opened.
 
 **Camera / face check-in not working**
 - The site must be served over HTTPS. Use the Cloudflare Tunnel or a domain with TLS.

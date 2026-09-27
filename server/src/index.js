@@ -54,12 +54,10 @@ app.use(errorHandler);
 const server = app.listen(config.port, () => {
   console.log(`[api] listening on port ${config.port} (${config.env})`);
 
-  // Local development: pull Telegram updates instead of receiving webhooks.
-  if (config.telegram.mode === 'polling') {
-    startTelegramPolling().catch((err) =>
-      console.error('[telegram:polling] failed to start', err.message),
-    );
-  }
+  // Pull Telegram updates (long-polling). No public URL or webhook required.
+  startTelegramPolling().catch((err) =>
+    console.error('[telegram:polling] failed to start', err.message),
+  );
 });
 
 async function shutdown(signal) {

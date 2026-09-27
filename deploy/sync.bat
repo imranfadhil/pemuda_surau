@@ -89,53 +89,43 @@ REM Create .env on first deploy, then patch the values we manage.
 ssh %SSH_OPTS% root@%PUBLIC_IP% "cd %REMOTE_DIR% && test -f .env || cp .env.example .env" <nul
 
 REM Generate a strong JWT secret + DB password on first run (only if still default).
-ssh %SSH_OPTS% root@%PUBLIC_IP% "cd %REMOTE_DIR% && grep -q '^JWT_SECRET=change_this' .env && sed -i \"s|^JWT_SECRET=.*|JWT_SECRET=$(openssl rand -hex 32)|\" .env || true" <nul
-ssh %SSH_OPTS% root@%PUBLIC_IP% "cd %REMOTE_DIR% && grep -q '^POSTGRES_PASSWORD=change_this' .env && sed -i \"s|^POSTGRES_PASSWORD=.*|POSTGRES_PASSWORD=$(openssl rand -hex 16)|\" .env || true" <nul
+REM NOTE: use a '#' sed delimiter with no quotes so the remote shell expands $(openssl ...).
+ssh %SSH_OPTS% root@%PUBLIC_IP% "cd %REMOTE_DIR% && grep -q '^JWT_SECRET=change_this' .env && sed -i s#^JWT_SECRET=.*#JWT_SECRET=$(openssl rand -hex 32)# .env || true" <nul
+ssh %SSH_OPTS% root@%PUBLIC_IP% "cd %REMOTE_DIR% && grep -q '^POSTGRES_PASSWORD=change_this' .env && sed -i s#^POSTGRES_PASSWORD=.*#POSTGRES_PASSWORD=$(openssl rand -hex 16)# .env || true" <nul
 
 REM Apply values from config.bat.
-if not "%CLOUDFLARE_TUNNEL_TOKEN%"=="" (
-    ssh %SSH_OPTS% root@%PUBLIC_IP% "cd %REMOTE_DIR% && sed -i \"s|^CLOUDFLARE_TUNNEL_TOKEN=.*|CLOUDFLARE_TUNNEL_TOKEN=%CLOUDFLARE_TUNNEL_TOKEN%|\" .env" <nul
-)
 if not "%DOMAIN%"=="" (
-    ssh %SSH_OPTS% root@%PUBLIC_IP% "cd %REMOTE_DIR% && sed -i \"s|^CORS_ORIGIN=.*|CORS_ORIGIN=https://%DOMAIN%|\" .env" <nul
+    ssh %SSH_OPTS% root@%PUBLIC_IP% "cd %REMOTE_DIR% && sed -i 's|^CORS_ORIGIN=.*|CORS_ORIGIN=https://%DOMAIN%|' .env" <nul
 )
 if not "%ADMIN_PHONES%"=="" (
-    ssh %SSH_OPTS% root@%PUBLIC_IP% "cd %REMOTE_DIR% && sed -i \"s|^ADMIN_PHONES=.*|ADMIN_PHONES=%ADMIN_PHONES%|\" .env" <nul
+    ssh %SSH_OPTS% root@%PUBLIC_IP% "cd %REMOTE_DIR% && sed -i 's|^ADMIN_PHONES=.*|ADMIN_PHONES=%ADMIN_PHONES%|' .env" <nul
 )
 if not "%OTP_CHANNEL%"=="" (
-    ssh %SSH_OPTS% root@%PUBLIC_IP% "cd %REMOTE_DIR% && sed -i \"s|^OTP_CHANNEL=.*|OTP_CHANNEL=%OTP_CHANNEL%|\" .env" <nul
+    ssh %SSH_OPTS% root@%PUBLIC_IP% "cd %REMOTE_DIR% && sed -i 's|^OTP_CHANNEL=.*|OTP_CHANNEL=%OTP_CHANNEL%|' .env" <nul
 )
 if not "%TELEGRAM_BOT_TOKEN%"=="" (
-    ssh %SSH_OPTS% root@%PUBLIC_IP% "cd %REMOTE_DIR% && sed -i \"s|^TELEGRAM_BOT_TOKEN=.*|TELEGRAM_BOT_TOKEN=%TELEGRAM_BOT_TOKEN%|\" .env" <nul
+    ssh %SSH_OPTS% root@%PUBLIC_IP% "cd %REMOTE_DIR% && sed -i 's|^TELEGRAM_BOT_TOKEN=.*|TELEGRAM_BOT_TOKEN=%TELEGRAM_BOT_TOKEN%|' .env" <nul
 )
 if not "%TELEGRAM_BOT_USERNAME%"=="" (
-    ssh %SSH_OPTS% root@%PUBLIC_IP% "cd %REMOTE_DIR% && sed -i \"s|^TELEGRAM_BOT_USERNAME=.*|TELEGRAM_BOT_USERNAME=%TELEGRAM_BOT_USERNAME%|\" .env" <nul
-)
-if not "%TELEGRAM_WEBHOOK_SECRET%"=="" (
-    ssh %SSH_OPTS% root@%PUBLIC_IP% "cd %REMOTE_DIR% && sed -i \"s|^TELEGRAM_WEBHOOK_SECRET=.*|TELEGRAM_WEBHOOK_SECRET=%TELEGRAM_WEBHOOK_SECRET%|\" .env" <nul
-)
-if not "%TELEGRAM_MODE%"=="" (
-    ssh %SSH_OPTS% root@%PUBLIC_IP% "cd %REMOTE_DIR% && sed -i \"s|^TELEGRAM_MODE=.*|TELEGRAM_MODE=%TELEGRAM_MODE%|\" .env" <nul
+    ssh %SSH_OPTS% root@%PUBLIC_IP% "cd %REMOTE_DIR% && sed -i 's|^TELEGRAM_BOT_USERNAME=.*|TELEGRAM_BOT_USERNAME=%TELEGRAM_BOT_USERNAME%|' .env" <nul
 )
 if not "%DOMAIN%"=="" (
-    ssh %SSH_OPTS% root@%PUBLIC_IP% "cd %REMOTE_DIR% && sed -i \"s|^PUBLIC_URL=.*|PUBLIC_URL=https://%DOMAIN%|\" .env" <nul
+    ssh %SSH_OPTS% root@%PUBLIC_IP% "cd %REMOTE_DIR% && sed -i 's|^PUBLIC_URL=.*|PUBLIC_URL=https://%DOMAIN%|' .env" <nul
 )
 if not "%SMS_PROVIDER%"=="" (
-    ssh %SSH_OPTS% root@%PUBLIC_IP% "cd %REMOTE_DIR% && sed -i \"s|^SMS_PROVIDER=.*|SMS_PROVIDER=%SMS_PROVIDER%|\" .env" <nul
+    ssh %SSH_OPTS% root@%PUBLIC_IP% "cd %REMOTE_DIR% && sed -i 's|^SMS_PROVIDER=.*|SMS_PROVIDER=%SMS_PROVIDER%|' .env" <nul
 )
 if not "%SMS_API_KEY%"=="" (
-    ssh %SSH_OPTS% root@%PUBLIC_IP% "cd %REMOTE_DIR% && sed -i \"s|^SMS_API_KEY=.*|SMS_API_KEY=%SMS_API_KEY%|\" .env" <nul
+    ssh %SSH_OPTS% root@%PUBLIC_IP% "cd %REMOTE_DIR% && sed -i 's|^SMS_API_KEY=.*|SMS_API_KEY=%SMS_API_KEY%|' .env" <nul
 )
 if not "%SMS_SENDER_ID%"=="" (
-    ssh %SSH_OPTS% root@%PUBLIC_IP% "cd %REMOTE_DIR% && sed -i \"s|^SMS_SENDER_ID=.*|SMS_SENDER_ID=%SMS_SENDER_ID%|\" .env" <nul
+    ssh %SSH_OPTS% root@%PUBLIC_IP% "cd %REMOTE_DIR% && sed -i 's|^SMS_SENDER_ID=.*|SMS_SENDER_ID=%SMS_SENDER_ID%|' .env" <nul
 )
 echo [OK] Environment ready.
 
 REM -- Start containers -----------------------------------------------
 echo [5/5] Starting containers...
-set REMOTE_CMD=cd %REMOTE_DIR% ^&^& docker compose
-if not "%COMPOSE_PROFILE%"=="" set REMOTE_CMD=!REMOTE_CMD! --profile %COMPOSE_PROFILE%
-set REMOTE_CMD=!REMOTE_CMD! up -d
+set REMOTE_CMD=cd %REMOTE_DIR% ^&^& docker compose up -d
 if %BUILD% equ 1 set REMOTE_CMD=!REMOTE_CMD! --build
 
 ssh %SSH_OPTS% root@%PUBLIC_IP% "!REMOTE_CMD!" <nul
@@ -153,12 +143,27 @@ echo.
 echo [INFO] Container status:
 ssh %SSH_OPTS% root@%PUBLIC_IP% "cd %REMOTE_DIR% && docker compose ps" <nul
 
-if not "%DOMAIN%"=="" (
-    echo.
-    echo [OK] App: https://%DOMAIN%/
+REM -- Quick tunnel URL (random *.trycloudflare.com) -------------------
+set QUICK_URL=
+echo.
+echo [INFO] Waiting for the quick tunnel URL...
+for /l %%n in (1,1,15) do (
+    if "!QUICK_URL!"=="" (
+        ssh %SSH_OPTS% root@%PUBLIC_IP% "cd %REMOTE_DIR% && docker compose logs quicktunnel | grep -o https://[a-z0-9-]*\.trycloudflare\.com | head -1" <nul > "%TEMP%\%PROJECT_NAME%-quick-url.txt" 2>nul
+        for /f "usebackq delims=" %%u in ("%TEMP%\%PROJECT_NAME%-quick-url.txt") do set QUICK_URL=%%u
+        if "!QUICK_URL!"=="" ping -n 3 127.0.0.1 >nul 2>&1
+    )
+)
+del "%TEMP%\%PROJECT_NAME%-quick-url.txt" 2>nul
+
+echo.
+if not "!QUICK_URL!"=="" (
+    echo [OK] App: !QUICK_URL!
+    echo [INFO] This URL is random and changes whenever the tunnel restarts.
+    echo [INFO] Telegram uses long-polling, so OTP works regardless of the URL.
 ) else (
-    echo.
-    echo [OK] App: http://%PUBLIC_IP%/
+    echo [WARN] Quick tunnel URL not ready yet. Check:
+    echo        ssh -i %KEY_FILE% root@%PUBLIC_IP% "cd %REMOTE_DIR% && docker compose logs quicktunnel"
 )
 
 endlocal

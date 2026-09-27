@@ -46,8 +46,8 @@ statistics, rankings, and program management.
 
 - `web/` — React + Vite SPA, served by Nginx (also proxies `/api` to the API)
 - `server/` — Express REST API, JWT auth, face matching, PostgreSQL via `pg`
-- `cloudflared` — optional tunnel service (Compose profile `tunnel`) for public HTTPS
-- `docker-compose.yml` — db + api + web (+ tunnel), with a named volume for data persistence
+- `quicktunnel` — Cloudflare Quick Tunnel for public HTTPS (free, no account needed)
+- `docker-compose.yml` — db + api + web + quicktunnel, with a named volume for data persistence
 
 ## Local development
 
@@ -91,9 +91,8 @@ See `.env.example`. Key ones:
 | `OTP_CHANNEL` | `telegram` (free), `sms` (paid), or `console` (dev) |
 | `TELEGRAM_BOT_TOKEN` | Bot token from @BotFather |
 | `TELEGRAM_BOT_USERNAME` | Bot username (without `@`) |
-| `TELEGRAM_WEBHOOK_SECRET` | Optional secret for webhook verification |
-| `TELEGRAM_MODE` | `webhook` (production) or `polling` (local dev) |
-| `PUBLIC_URL` | Public base URL, used to register the Telegram webhook |
+| `TELEGRAM_POLL_TIMEOUT` | Long-poll duration in seconds (default 30) |
+| `PUBLIC_URL` | Public base URL (optional; shown in links) |
 | `SMS_PROVIDER` | `console`, `twilio`, or `vonage` (only when `OTP_CHANNEL=sms`) |
 | `SMS_API_KEY` | Twilio: `accountSid:authToken`; Vonage: `api_key` |
 | `SMS_SENDER_ID` | Sender number/ID (Twilio `From`, Vonage `from`) |
@@ -123,14 +122,9 @@ read it out in person.
    OTP_CHANNEL=telegram
    TELEGRAM_BOT_TOKEN=123456:ABC...
    TELEGRAM_BOT_USERNAME=your_bot_name
-   PUBLIC_URL=https://surau.yourdomain.com
    ```
-3. Restart the API, then register the webhook (once):
-   ```bash
-   curl -X POST https://surau.yourdomain.com/api/telegram/set-webhook \
-     -H "Authorization: Bearer <admin-token>"
-   ```
-   Or use the admin panel. The webhook must be reachable over **HTTPS**.
+3. Restart the API. The server **long-polls** Telegram for updates, so no public URL or
+   webhook registration is needed — it works behind the quick tunnel and on `localhost` alike.
 4. Members tap **Sign in with Telegram** on the login screen (or **Profile → Link Telegram**),
    then press **Start** and **Share my phone number**.
 
@@ -138,31 +132,21 @@ Once linked, codes arrive as Telegram messages — no SMS costs. Because the pho
 shared through Telegram's verified contact button, a brand-new member can link and log in
 without ever needing an admin.
 
-#### Testing Telegram locally (polling mode)
+#### How updates are received (long-polling)
 
-Telegram webhooks require a public HTTPS URL, so they can't reach `localhost`. For local
-development, switch to **polling** — the server pulls updates instead:
-
-```
-TELEGRAM_MODE=polling
-```
-
-Then restart the API. You'll see:
+The server pulls updates with `getUpdates` instead of receiving webhooks. On startup you'll see:
 
 ```
 [telegram:polling] started (long-polling for updates)
 ```
 
-No tunnel or public URL needed. Polling automatically clears any registered webhook, since
-Telegram allows only one delivery method at a time.
+This is the **only** delivery mode, chosen because the quick-tunnel URL changes on every
+restart — polling needs no public URL, so OTP keeps working unattended. Polling automatically
+clears any registered webhook, since Telegram allows only one delivery method at a time.
 
-| Mode | Use for | Needs public HTTPS |
-| --- | --- | --- |
-| `webhook` (default) | Production | Yes |
-| `polling` | Local development | No |
-
-> **Note:** polling is fine for development but less efficient in production (it holds an
-> open long-poll connection). Keep `webhook` for your deployed server.
+> **Note:** Telegram allows only **one** `getUpdates` consumer per bot token. Run a single
+> `api` instance, and don't run a local stack and the deployed server with the same bot token
+> at the same time — they'll fight over updates (`Conflict: terminated by other getUpdates`).
 
 ### Admin-assisted login (last resort)
 
@@ -234,50 +218,34 @@ docker compose logs -f api     # watch migrations run
 The app is now reachable locally at `http://127.0.0.1:8080` (the web port is bound to
 localhost by default — see step 5 for public HTTPS access).
 
-### 5. HTTPS via Cloudflare Tunnel (recommended)
+### 5. HTTPS via Cloudflare Quick Tunnel
 
 Cloudflare Tunnel gives you HTTPS with a valid certificate **without opening any inbound
 ports** and without managing certificates. It is ideal here because browsers only allow
 camera access (`getUserMedia`) over **HTTPS** or `localhost` — so face check-in needs HTTPS
 in production.
 
-This setup uses a **named tunnel** with a stable domain that survives restarts.
-
-**a. Create the tunnel**
-
-1. Add your domain to Cloudflare (free plan is fine) and let it manage DNS.
-2. Go to **Zero Trust → Networks → Tunnels → Create a tunnel** (Cloudflare dashboard).
-3. Choose **Cloudflared**, name it e.g. `pemuda-surau`, and copy the **token**.
-4. Under **Public Hostnames**, add one:
-   - **Subdomain/Domain:** `surau.yourdomain.com`
-   - **Service Type:** `HTTP`
-   - **URL:** `web:80`  ← the Docker service name, not `localhost`
-
-**b. Configure and start**
+The stack runs a **Cloudflare Quick Tunnel** by default (`quicktunnel` service). It needs
+**no Cloudflare account, domain, or token** — just start the stack and read the URL:
 
 ```bash
-nano .env      # set CLOUDFLARE_TUNNEL_TOKEN=<your token>
-docker compose --profile tunnel up -d
-docker compose logs -f cloudflared
+cd /opt/pemuda_surau
+docker compose up -d
+docker compose logs quicktunnel | grep -o 'https://[a-z0-9-]*\.trycloudflare\.com' | head -1
 ```
 
-Your app is now live at `https://surau.yourdomain.com` with automatic TLS.
+Your app is live at that `https://<words>.trycloudflare.com` URL with automatic TLS.
 
-**c. Lock down CORS**
+> **Note:** the quick-tunnel URL is **random and changes every time the tunnel restarts**.
+> For a stable domain, add a named Cloudflare Tunnel (token + domain) as a separate service
+> and point its public hostname at `HTTP` / `web:80`.
 
-Once you know your domain, set it in `.env` and restart the API:
-
-```bash
-CORS_ORIGIN=https://surau.yourdomain.com
-```
+**Lock down CORS** once you know the URL (optional):
 
 ```bash
+CORS_ORIGIN=https://<your-url>.trycloudflare.com
 docker compose up -d api
 ```
-
-> **Note:** the `cloudflared` service uses a Compose profile, so a plain
-> `docker compose up -d` runs the app *without* the tunnel (handy for local development).
-> Always include `--profile tunnel` on the server.
 
 > **Security:** because the web port is bound to `127.0.0.1`, the app is not reachable
 > directly from the internet — only through Cloudflare. Keep it that way. If you must expose
@@ -344,8 +312,6 @@ docker compose up -d --build
 | POST | `/api/telegram/link-token` | user | Create a Telegram link token |
 | DELETE | `/api/telegram/link` | user | Unlink Telegram |
 | GET | `/api/telegram/status` | admin | Telegram integration status |
-| POST | `/api/telegram/set-webhook` | admin | Register the Telegram webhook |
-| POST | `/api/telegram/webhook` | – | Telegram update receiver |
 | POST | `/api/attendance/check-in` | user | Face-verified check-in |
 | GET | `/api/attendance/me` | user | My history |
 | GET | `/api/attendance/me/today` | user | Today's prayers |

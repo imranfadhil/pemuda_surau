@@ -41,8 +41,6 @@ services:
       OTP_CHANNEL: ${OTP_CHANNEL:-telegram}
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
       TELEGRAM_BOT_USERNAME: ${TELEGRAM_BOT_USERNAME:-}
-      TELEGRAM_WEBHOOK_SECRET: ${TELEGRAM_WEBHOOK_SECRET:-}
-      TELEGRAM_MODE: ${TELEGRAM_MODE:-webhook}
       TELEGRAM_POLL_TIMEOUT: ${TELEGRAM_POLL_TIMEOUT:-30}
       PUBLIC_URL: ${PUBLIC_URL:-}
       SMS_PROVIDER: ${SMS_PROVIDER:-console}
@@ -68,15 +66,14 @@ services:
     networks:
       - surau
 
-    # Cloudflare Tunnel — provides HTTPS without opening inbound ports.
-  # Enable with:  docker compose --profile tunnel up -d
-  cloudflared:
+    # Cloudflare Quick Tunnel — free random *.trycloudflare.com HTTPS URL.
+  # No Cloudflare account or token required. The URL changes on every restart.
+  quicktunnel:
     image: cloudflare/cloudflared:latest
     restart: unless-stopped
-    profiles: ["tunnel"]
     depends_on:
       - web
-    command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN}
+    command: tunnel --no-autoupdate --url http://web:80
     networks:
       - surau
 

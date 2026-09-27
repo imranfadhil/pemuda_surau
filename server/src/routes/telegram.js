@@ -7,10 +7,7 @@ import { asyncHandler, httpError } from '../middleware/errors.js';
 import {
   isTelegramConfigured,
   buildLinkUrl,
-  setTelegramWebhook,
-  getTelegramWebhookInfo,
 } from '../utils/telegram.js';
-import { handleTelegramUpdate } from '../utils/telegramUpdates.js';
 
 const router = Router();
 
@@ -68,58 +65,14 @@ router.get(
   requireAuth,
   requireAdmin,
   asyncHandler(async (req, res) => {
-    const info = await getTelegramWebhookInfo();
     const { rows } = await query(
       `SELECT COUNT(*)::int AS linked FROM users WHERE telegram_chat_id IS NOT NULL`,
     );
     res.json({
       configured: isTelegramConfigured(),
-      mode: config.telegram.mode,
       botUsername: config.telegram.botUsername || null,
       linkedUsers: rows[0].linked,
-      webhook: info,
     });
-  }),
-);
-
-/** Admin: (re)register the webhook with Telegram. */
-router.post(
-  '/set-webhook',
-  requireAuth,
-  requireAdmin,
-  asyncHandler(async (req, res) => {
-    const publicUrl = req.body?.publicUrl || config.publicUrl;
-    if (!publicUrl) {
-      throw httpError(400, 'A public URL is required (set PUBLIC_URL or pass publicUrl)');
-    }
-    const result = await setTelegramWebhook(publicUrl);
-    res.json(result);
-  }),
-);
-
-/**
- * Telegram webhook. Telegram POSTs updates here.
- * Handles /start <token> to link a chat to a user account.
- */
-router.post(
-  '/webhook',
-  asyncHandler(async (req, res) => {
-    // Verify the secret token if one is configured.
-    if (config.telegram.webhookSecret) {
-      const provided = req.headers['x-telegram-bot-api-secret-token'];
-      if (provided !== config.telegram.webhookSecret) {
-        return res.status(401).json({ ok: false });
-      }
-    }
-
-    // Always ack quickly so Telegram doesn't retry.
-    res.json({ ok: true });
-
-    try {
-      await handleTelegramUpdate(req.body);
-    } catch (err) {
-      console.error('[telegram:webhook] failed to handle update', err.message);
-    }
   }),
 );
 

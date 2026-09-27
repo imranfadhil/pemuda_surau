@@ -46,30 +46,11 @@ export async function sendTelegramMessage(chatId, text, options = {}) {
 }
 
 /**
- * Register the webhook so Telegram forwards updates to our API.
- * Call once after deploying (or via the admin panel).
+ * Remove any registered webhook.
+ *
+ * Telegram allows only ONE delivery method at a time, so polling must clear a
+ * webhook before getUpdates will return anything. Called on startup.
  */
-export async function setTelegramWebhook(publicUrl) {
-  if (!isTelegramConfigured()) {
-    throw new Error('Telegram bot token not configured');
-  }
-  const url = `${publicUrl.replace(/\/$/, '')}/api/telegram/webhook`;
-  const res = await fetch(apiUrl('setWebhook'), {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      url,
-      secret_token: config.telegram.webhookSecret || undefined,
-      allowed_updates: ['message'],
-    }),
-  });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok || data.ok === false) {
-    throw new Error(data.description || `Telegram error ${res.status}`);
-  }
-  return { ok: true, url };
-}
-
 export async function deleteTelegramWebhook() {
   if (!isTelegramConfigured()) return { ok: true };
   const res = await fetch(apiUrl('deleteWebhook'), { method: 'POST' });
@@ -77,15 +58,8 @@ export async function deleteTelegramWebhook() {
   return { ok: res.ok && data.ok !== false };
 }
 
-export async function getTelegramWebhookInfo() {
-  if (!isTelegramConfigured()) return null;
-  const res = await fetch(apiUrl('getWebhookInfo'));
-  const data = await res.json().catch(() => ({}));
-  return data.result || null;
-}
-
 /**
- * Long-poll for updates. Used by polling mode (local development).
+ * Long-poll for updates. Used by the polling loop.
  * `timeout` is the long-poll duration in seconds.
  */
 export async function getUpdates(offset, timeout = 30) {

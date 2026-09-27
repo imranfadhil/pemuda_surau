@@ -33,11 +33,6 @@ REM Your public domain (e.g. surau.example.com). Used for CORS + shown after dep
 REM Leave blank if you only use the droplet IP.
 set DOMAIN=
 
-REM Cloudflare Tunnel token (named tunnel -> stable HTTPS URL).
-REM Create at: Zero Trust -> Networks -> Tunnels -> Create a tunnel
-REM Public hostname must point to service  HTTP  /  web:80
-set CLOUDFLARE_TUNNEL_TOKEN=
-
 REM Comma-separated phone numbers that get admin rights on first login
 set ADMIN_PHONES=
 
@@ -45,10 +40,6 @@ REM ---- Telegram (free OTP delivery) ----
 REM Create a bot with @BotFather -> /newbot, then paste the token + username here.
 set TELEGRAM_BOT_TOKEN=
 set TELEGRAM_BOT_USERNAME=
-REM Optional random string Telegram sends in the webhook secret header
-set TELEGRAM_WEBHOOK_SECRET=
-REM Delivery mode: webhook (production) | polling (local dev)
-set TELEGRAM_MODE=webhook
 
 REM How login codes are delivered: telegram | sms | console
 set OTP_CHANNEL=telegram
@@ -57,8 +48,3 @@ REM SMS provider: console | twilio | vonage (only used when OTP_CHANNEL=sms)
 set SMS_PROVIDER=console
 set SMS_API_KEY=
 set SMS_SENDER_ID=
-
-REM Compose profile to enable on the server.
-REM   tunnel  = start the Cloudflare Tunnel (recommended)
-REM   (blank) = app only, no public HTTPS
-set COMPOSE_PROFILE=tunnel

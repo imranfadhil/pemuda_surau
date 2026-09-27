@@ -9,8 +9,8 @@ let offset = 0;
 /**
  * Long-poll Telegram for updates.
  *
- * Used for local development: no public HTTPS URL or tunnel required.
- * Enable with TELEGRAM_MODE=polling.
+ * This is the only delivery mode: it needs no public HTTPS URL, so it keeps
+ * working even though the quick-tunnel URL changes on every restart.
  *
  * Note: Telegram only allows ONE delivery method at a time, so we delete any
  * existing webhook before polling starts.

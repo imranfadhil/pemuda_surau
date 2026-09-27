@@ -24,9 +24,7 @@ export const config = {
   telegram: {
     botToken: process.env.TELEGRAM_BOT_TOKEN || '',
     botUsername: process.env.TELEGRAM_BOT_USERNAME || '',
-    webhookSecret: process.env.TELEGRAM_WEBHOOK_SECRET || '',
-    // Delivery mode: webhook (production) | polling (local dev)
-    mode: process.env.TELEGRAM_MODE || 'webhook',
+    // Long-poll duration in seconds.
     pollTimeoutSeconds: Number(process.env.TELEGRAM_POLL_TIMEOUT || 30),
   },
   // Prayer times + automatic check-in windows (Aladhan API).
