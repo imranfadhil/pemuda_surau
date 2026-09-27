@@ -51,7 +51,7 @@ export default function LoginPage() {
     try {
       const res = await api.verifyOtp(phone, code);
       login(res.token, res.user);
-      navigate(res.needsProfile ? '/register' : '/', { replace: true });
+      navigate(res.needsProfile ? '/register' : '/home', { replace: true });
     } catch (err) {
       setError(err.message);
     } finally {

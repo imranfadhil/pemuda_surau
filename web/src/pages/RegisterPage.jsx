@@ -72,7 +72,7 @@ export default function RegisterPage() {
       stopCamera(streamRef.current);
       setCameraOn(false);
       setFaceStatus('Face enrolled successfully!');
-      setTimeout(() => navigate('/', { replace: true }), 900);
+      setTimeout(() => navigate('/home', { replace: true }), 900);
     } catch (err) {
       setError(err.message);
       setFaceStatus('');

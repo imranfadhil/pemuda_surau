@@ -9,10 +9,10 @@ const PRAYERS = ['subuh', 'zuhur', 'asar', 'maghrib', 'isyak'];
 
 /**
  * Overall stats: totals, today's counts per prayer, and active member count.
+ * Public: the dashboard is the app's landing page and is visible without login.
  */
 router.get(
   '/stats',
-  requireAuth,
   asyncHandler(async (req, res) => {
     const today = new Date().toISOString().slice(0, 10);
 
@@ -48,10 +48,10 @@ router.get(
 /**
  * Leaderboard / ranking. Ranks members by total check-ins, with a
  * configurable window (all-time by default).
+ * Public: shown on the landing dashboard without login.
  */
 router.get(
   '/leaderboard',
-  requireAuth,
   asyncHandler(async (req, res) => {
     const days = Number(req.query.days || 0);
     const params = [];

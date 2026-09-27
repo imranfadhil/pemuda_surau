@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { QRCodeSVG } from 'qrcode.react';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
 } from 'recharts';
@@ -18,6 +20,13 @@ export default function DashboardPage() {
   const [leaders, setLeaders] = useState([]);
   const [range, setRange] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [loginUrl, setLoginUrl] = useState('');
+
+  useEffect(() => {
+    // Auto-generate the login link from the current URL so the QR always
+    // points at wherever this app is being served from.
+    setLoginUrl(`${window.location.origin}/login`);
+  }, []);
 
   useEffect(() => {
     api.stats().then(setStats).catch(() => {});
@@ -46,6 +55,29 @@ export default function DashboardPage() {
     <div>
       <h1 className="page-title">Dashboard & ranking</h1>
       <p className="page-sub">Attendance statistics across the surau.</p>
+
+      <div className="card qr-card">
+        <div className="qr-box">
+          {loginUrl && (
+            <QRCodeSVG value={loginUrl} size={148} level="M" marginSize={1} />
+          )}
+        </div>
+        <div className="qr-info">
+          <h2 className="card-title">📱 Scan to log in</h2>
+          <p className="muted" style={{ margin: '6px 0 12px' }}>
+            Point your phone camera at the code to open the login page and check in.
+          </p>
+          {user ? (
+            <Link className="btn btn-sm" to="/check-in">
+              Go to check-in
+            </Link>
+          ) : (
+            <Link className="btn btn-sm" to="/login">
+              Log in
+            </Link>
+          )}
+        </div>
+      </div>
 
       <div className="stat-grid">
         <div className="stat">

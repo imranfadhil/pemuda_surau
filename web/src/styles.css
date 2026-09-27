@@ -108,6 +108,7 @@ textarea:focus {
   gap: 10px;
   font-weight: 700;
   font-size: 1.05rem;
+  color: white;
 }
 
 .brand-logo {
@@ -186,6 +187,28 @@ textarea:focus {
   font-size: 1.05rem;
   font-weight: 700;
   margin: 0 0 4px;
+}
+
+/* ---- Login QR card ---- */
+.qr-card {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.qr-box {
+  background: white;
+  padding: 10px;
+  border-radius: 14px;
+  border: 1px solid var(--slate-200);
+  line-height: 0;
+  flex-shrink: 0;
+}
+
+.qr-info {
+  flex: 1;
+  min-width: 200px;
 }
 
 .muted {

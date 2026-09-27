@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate, NavLink, useLocation } from 'react-router-dom';
+import { Routes, Route, Navigate, NavLink, Link, useLocation } from 'react-router-dom';
 import { useAuth } from './lib/auth.jsx';
 import LoginPage from './pages/LoginPage.jsx';
 import RegisterPage from './pages/RegisterPage.jsx';
@@ -12,13 +12,18 @@ import AdminPage from './pages/AdminPage.jsx';
 
 function BottomNav() {
   const { user } = useAuth();
-  const items = [
-    { to: '/', label: 'Home', icon: '🏠' },
-    { to: '/check-in', label: 'Check-in', icon: '🕌' },
-    { to: '/dashboard', label: 'Ranking', icon: '🏆' },
-    { to: '/programs', label: 'Programs', icon: '📅' },
-    { to: '/profile', label: 'Profile', icon: '👤' },
-  ];
+  const items = user
+    ? [
+        { to: '/', label: 'Dashboard', icon: '🏆' },
+        { to: '/home', label: 'Home', icon: '🏠' },
+        { to: '/check-in', label: 'Check-in', icon: '🕌' },
+        { to: '/programs', label: 'Programs', icon: '📅' },
+        { to: '/profile', label: 'Profile', icon: '👤' },
+      ]
+    : [
+        { to: '/', label: 'Dashboard', icon: '🏆' },
+        { to: '/login', label: 'Log in', icon: '🔑' },
+      ];
   if (user?.role === 'admin') {
     items.push({ to: '/admin', label: 'Admin', icon: '⚙️' });
   }
@@ -38,15 +43,23 @@ function TopBar() {
   const { user, logout } = useAuth();
   return (
     <header className="topbar">
-      <div className="brand">
+      <Link className="brand" to="/">
         <span className="brand-logo">🕌</span>
         <span>Surau Al-Abqori</span>
-      </div>
+      </Link>
       <div className="topbar-user">
-        <span>{user?.fullName}</span>
-        <button className="btn-ghost" onClick={logout}>
-          Log out
-        </button>
+        {user ? (
+          <>
+            <span>{user.fullName}</span>
+            <button className="btn-ghost" onClick={logout}>
+              Log out
+            </button>
+          </>
+        ) : (
+          <Link className="btn-ghost" to="/login">
+            Log in
+          </Link>
+        )}
       </div>
     </header>
   );
@@ -75,41 +88,77 @@ export default function App() {
     <Routes>
       <Route path="/login" element={token ? <Navigate to="/" replace /> : <LoginPage />} />
       <Route
-        path="/register"
-        element={
-          <Protected>
-            <RegisterPage />
-          </Protected>
-        }
-      />
-      <Route
         path="/*"
         element={
-          <Protected>
-            <div className="app-shell">
-              <TopBar />
-              <main className="main">
-                <Routes>
-                  <Route path="/" element={<HomePage />} />
-                  <Route path="/check-in" element={<CheckInPage />} />
-                  <Route path="/dashboard" element={<DashboardPage />} />
-                  <Route path="/programs" element={<ProgramsPage />} />
-                  <Route path="/profile" element={<ProfilePage />} />
-                  <Route path="/family" element={<DependentPage />} />
-                  <Route
-                    path="/admin"
-                    element={
+          <div className="app-shell">
+            <TopBar />
+            <main className="main">
+              <Routes>
+                {/* Public landing page — visible without login. */}
+                <Route path="/" element={<DashboardPage />} />
+                <Route
+                  path="/home"
+                  element={
+                    <Protected>
+                      <HomePage />
+                    </Protected>
+                  }
+                />
+                <Route
+                  path="/check-in"
+                  element={
+                    <Protected>
+                      <CheckInPage />
+                    </Protected>
+                  }
+                />
+                <Route
+                  path="/programs"
+                  element={
+                    <Protected>
+                      <ProgramsPage />
+                    </Protected>
+                  }
+                />
+                <Route
+                  path="/profile"
+                  element={
+                    <Protected>
+                      <ProfilePage />
+                    </Protected>
+                  }
+                />
+                <Route
+                  path="/register"
+                  element={
+                    <Protected>
+                      <RegisterPage />
+                    </Protected>
+                  }
+                />
+                <Route
+                  path="/family"
+                  element={
+                    <Protected>
+                      <DependentPage />
+                    </Protected>
+                  }
+                />
+                <Route
+                  path="/admin"
+                  element={
+                    <Protected>
                       <AdminOnly>
                         <AdminPage />
                       </AdminOnly>
-                    }
-                  />
-                  <Route path="*" element={<Navigate to="/" replace />} />
-                </Routes>
-              </main>
-              <BottomNav />
-            </div>
-          </Protected>
+                    </Protected>
+                  }
+                />
+                <Route path="*" element={<Navigate to="/" replace />} />
+              </Routes>
+            </main>
+            <BottomNav />
+          </div>
         }
       />
     </Routes>
