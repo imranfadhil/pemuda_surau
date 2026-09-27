@@ -95,12 +95,28 @@ backup.bat --restore    REM restore the latest backup (DESTRUCTIVE)
 4. Creates `.env` on first deploy and **auto-generates** strong `JWT_SECRET` and
    `POSTGRES_PASSWORD` values (generated whenever the line is missing or still a
    placeholder, so `.env.example` ships without them)
-5. Applies `CORS_ORIGIN`, `ADMIN_PHONES`, and SMS settings from `config.bat`
+5. Applies `CORS_ORIGIN`, `ADMIN_PHONES`, and SMS settings from `config.bat` by piping
+   `configure-env.sh` over SSH (values passed as positional args, so tokens with `:` or `+`
+   are never re-parsed by `cmd.exe`). The whole edit runs in one SSH call with `set -e`, so a
+   dropped connection aborts the sync instead of silently leaving `.env.example` defaults.
 6. Runs `docker compose up -d [--build]`, then reads the quick-tunnel URL from the
    `quicktunnel` logs and prints it
 
 > Secrets are generated on the server and never overwritten on later syncs, so your data
 > and sessions stay intact across deploys.
+
+> **Transient SSH failures.** Connections to the droplet occasionally time out (network
+> blips, not droplet load). Every SSH call is retried up to 4 times with a short backoff,
+> so a single blip no longer aborts the sync. If all retries fail, the script stops with a
+> clear error instead of continuing with a half-applied state.
+
+### Admin bootstrap
+
+On every API start the container runs `migrate` → `seedAdmins` → `index`. `seedAdmins`
+creates an active **admin** for each phone in `ADMIN_PHONES` (and promotes an existing
+account if it isn't an admin yet). This means a fresh deploy always has an admin who can
+sign in and reach the admin panel — no need to register first. It is idempotent and never
+overwrites a name or other profile fields.
 
 ## HTTPS via Cloudflare Quick Tunnel
 
@@ -110,9 +126,12 @@ random `https://<words>.trycloudflare.com` URL. No Cloudflare account, domain, o
 needed, and `sync.bat` reads the URL from the container logs and prints it when the deploy
 finishes.
 
-Caveats: the URL is **random and changes every time the tunnel restarts**, and it is
-intended for testing/demos rather than production. Telegram uses **long-polling**, so OTP
-delivery keeps working regardless of the URL — no webhook re-registration needed.
+Caveats: the URL is **random and changes every time the tunnel container restarts**, and it
+is intended for testing/demos rather than production. A normal `sync.bat` does **not**
+recreate the `quicktunnel` container, so the URL is **retained across ordinary syncs** — it
+only changes on `docker compose down`/`up`, a droplet reboot, or a compose-file change.
+Telegram uses **long-polling**, so OTP delivery keeps working regardless of the URL — no
+webhook re-registration needed.
 
 > Want a stable URL later? Add a named Cloudflare Tunnel (token + domain) as a separate
 > service and point its public hostname at `HTTP` / `web:80`.
@@ -127,7 +146,7 @@ delivery keeps working regardless of the URL — no webhook re-registration need
 | `SIZE` | `s-1vcpu-2gb` default; `s-1vcpu-1gb` to save cost |
 | `IMAGE` | `docker-20-04` (Docker + Compose preinstalled) |
 | `DOMAIN` | Public domain (used for CORS + shown after deploy) |
-| `ADMIN_PHONES` | Phones that become admins on first login |
+| `ADMIN_PHONES` | Phones seeded as admins on startup |
 | `OTP_CHANNEL` | `telegram` (free), `sms` (paid), or `console` |
 | `TELEGRAM_BOT_TOKEN` / `TELEGRAM_BOT_USERNAME` | Telegram bot credentials |
 | `SMS_PROVIDER` / `SMS_API_KEY` / `SMS_SENDER_ID` | SMS settings (only when `OTP_CHANNEL=sms`) |

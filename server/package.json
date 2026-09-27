@@ -9,6 +9,7 @@
     "start": "node src/index.js",
     "dev": "node --watch src/index.js",
     "migrate": "node src/migrate.js",
+    "seed-admins": "node src/seedAdmins.js",
     "simulate": "node scripts/simulate.mjs",
     "simulate:clear": "node scripts/simulate.mjs --clear"
   },

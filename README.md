@@ -150,7 +150,7 @@ See `.env.example`. Key ones:
 | `SMS_PROVIDER` | `console`, `twilio`, or `vonage` (only when `OTP_CHANNEL=sms`) |
 | `SMS_API_KEY` | Twilio: `accountSid:authToken`; Vonage: `api_key` |
 | `SMS_SENDER_ID` | Sender number/ID (Twilio `From`, Vonage `from`) |
-| `ADMIN_PHONES` | Comma-separated phones that become admins on first login |
+| `ADMIN_PHONES` | Comma-separated phones seeded as admins on startup |
 
 ## Login codes (OTP delivery)
 
@@ -167,6 +167,10 @@ If a member hasn't linked Telegram yet, the app falls back through these channel
 **Admin-assisted login is the last resort.** Only when none of the above can reach a member
 does the login screen suggest asking an admin, who can generate a code from the admin panel and
 read it out in person.
+
+> **Admin bootstrap:** every phone in `ADMIN_PHONES` is seeded as an active admin when the API
+> starts (see `server/src/seedAdmins.js`). A fresh deploy therefore always has an admin who can
+> sign in and reach the admin panel without registering first.
 
 ### Setting up Telegram (recommended — free)
 
@@ -279,18 +283,24 @@ ports** and without managing certificates. It is ideal here because browsers onl
 camera access (`getUserMedia`) over **HTTPS** or `localhost` — so face check-in needs HTTPS
 in production.
 
-The stack runs a **Cloudflare Quick Tunnel** by default (`quicktunnel` service). It needs
+The stack runs a **Cloudflare Quick Tunnel** by default (`quicktunnel` service). The URL is
+random but **retained across normal syncs** (the container is not recreated by a plain
+`docker compose up -d`); it only changes when the tunnel container restarts. It needs
 **no Cloudflare account, domain, or token** — just start the stack and read the URL:
 
 ```bash
 cd /opt/pemuda_surau
 docker compose up -d
-docker compose logs quicktunnel | grep -o 'https://[a-z0-9-]*\.trycloudflare\.com' | head -1
+docker compose logs quicktunnel | grep -o 'https://[a-z0-9-]*\.trycloudflare\.com' | tail -1
 ```
 
 Your app is live at that `https://<words>.trycloudflare.com` URL with automatic TLS.
 
-> **Note:** the quick-tunnel URL is **random and changes every time the tunnel restarts**.
+> **Note:** the quick-tunnel URL is **random and changes every time the tunnel container
+> restarts** (e.g. `docker compose down`/`up`, a droplet reboot, or a compose change). A
+> plain `docker compose up -d` leaves the container running, so the URL is **retained across
+> normal syncs**. Use `tail -1` (not `head -1`) to read the current URL — logs accumulate
+> across restarts, so the first match may be a dead URL.
 > For a stable domain, add a named Cloudflare Tunnel (token + domain) as a separate service
 > and point its public hostname at `HTTP` / `web:80`.
 

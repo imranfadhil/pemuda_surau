@@ -45,7 +45,14 @@ if not exist "%KEY_FILE%" (
     exit /b 1
 )
 
-set "SSH_OPTS=-o StrictHostKeyChecking=accept-new -i "%KEY_FILE%""
+REM ConnectTimeout bounds how long a dead/rebooting droplet can hang the script;
+REM ServerAlive* detects a connection that dies mid-command.
+set "SSH_OPTS=-o StrictHostKeyChecking=accept-new -o ConnectTimeout=15 -o ServerAliveInterval=5 -o ServerAliveCountMax=3 -i "%KEY_FILE%""
+
+REM Transient network blips between here and the droplet are common, so every
+REM SSH call is retried a few times (see :ssh_run / :ssh_pipe) before the sync
+REM is considered failed.
+set SSH_RETRIES=4
 
 REM -- Package code (exclude node_modules, .git, build output) --------
 echo [1/5] Packaging project...
@@ -60,7 +67,7 @@ echo [OK] Packaged.
 
 REM -- Copy to droplet ------------------------------------------------
 echo [2/5] Ensuring remote directory exists...
-ssh %SSH_OPTS% root@%PUBLIC_IP% "mkdir -p %REMOTE_DIR%" <nul
+call :ssh_run "mkdir -p %REMOTE_DIR%"
 if %ERRORLEVEL% neq 0 (
     echo [ERROR] Could not create remote directory. Droplet may still be booting.
     exit /b 1
@@ -68,7 +75,7 @@ if %ERRORLEVEL% neq 0 (
 echo [OK] Remote directory ready.
 
 echo [3/5] Copying to droplet...
-type "%TEMP%\%PROJECT_NAME%.tar" | ssh %SSH_OPTS% root@%PUBLIC_IP% "cat > %REMOTE_DIR%/app.tar"
+call :ssh_pipe "%TEMP%\%PROJECT_NAME%.tar" "cat > %REMOTE_DIR%/app.tar"
 set SCP_RC=%ERRORLEVEL%
 del "%TEMP%\%PROJECT_NAME%.tar" 2>nul
 if not %SCP_RC% equ 0 (
@@ -79,47 +86,43 @@ echo [OK] Uploaded.
 
 REM -- Extract + configure .env ---------------------------------------
 echo [4/5] Extracting and configuring environment...
-ssh %SSH_OPTS% root@%PUBLIC_IP% "cd %REMOTE_DIR% && tar -xf app.tar && rm -f app.tar" <nul
+call :ssh_run "cd %REMOTE_DIR% && tar -xf app.tar && rm -f app.tar"
 if %ERRORLEVEL% neq 0 (
     echo [ERROR] Extraction failed.
     exit /b 1
 )
 
 REM Create .env on first deploy, then patch the values we manage.
-ssh %SSH_OPTS% root@%PUBLIC_IP% "cd %REMOTE_DIR% && test -f .env || cp .env.example .env" <nul
+REM NOTE: every env edit runs in ONE ssh call so a dropped connection cannot
+REM       leave a half-applied .env (previously each sed was its own ssh call
+REM       with no exit-code check, so a timeout silently kept .env.example
+REM       defaults - e.g. ADMIN_PHONES and POSTGRES_PASSWORD).
+call :ssh_run "cd %REMOTE_DIR% && test -f .env || cp .env.example .env"
+if %ERRORLEVEL% neq 0 (
+    echo [ERROR] Could not create/verify remote .env. Droplet may be unreachable.
+    exit /b 1
+)
 
-REM Generate a strong JWT secret + DB password on first run (only if still default).
-REM NOTE: use a '#' sed delimiter with no quotes so the remote shell expands $(openssl ...).
-ssh %SSH_OPTS% root@%PUBLIC_IP% "cd %REMOTE_DIR% && grep -q '^JWT_SECRET=change_this' .env && sed -i s#^JWT_SECRET=.*#JWT_SECRET=$(openssl rand -hex 32)# .env || true" <nul
-ssh %SSH_OPTS% root@%PUBLIC_IP% "cd %REMOTE_DIR% && grep -q '^POSTGRES_PASSWORD=change_this' .env && sed -i s#^POSTGRES_PASSWORD=.*#POSTGRES_PASSWORD=$(openssl rand -hex 16)# .env || true" <nul
+REM Configure the remote .env by piping deploy\configure-env.sh over stdin.
+REM NOTE: the shell code lives in a file (not a cmd string) because cmd.exe
+REM       does NOT treat '\' as an escape - building the script inline left
+REM       injected quotes unbalanced, so cmd split the ssh line on '&&'/'|'
+REM       and tried to run '$1' as a command. Values are passed as positional
+REM       args so tokens with ':' or '+' are never re-parsed by cmd.
+set "ENV_TMP=%TEMP%\%PROJECT_NAME%-configure-env.sh"
+powershell -NoProfile -Command "(Get-Content -Raw '%DEPLOY_DIR%\configure-env.sh') -replace [char]13, '' | Set-Content -NoNewline '%ENV_TMP%' -Encoding ascii"
+if not exist "%ENV_TMP%" (
+    echo [ERROR] Could not prepare configure-env.sh.
+    exit /b 1
+)
 
-REM Apply values from config.bat.
-if not "%DOMAIN%"=="" (
-    ssh %SSH_OPTS% root@%PUBLIC_IP% "cd %REMOTE_DIR% && sed -i 's|^CORS_ORIGIN=.*|CORS_ORIGIN=https://%DOMAIN%|' .env" <nul
-)
-if not "%ADMIN_PHONES%"=="" (
-    ssh %SSH_OPTS% root@%PUBLIC_IP% "cd %REMOTE_DIR% && sed -i 's|^ADMIN_PHONES=.*|ADMIN_PHONES=%ADMIN_PHONES%|' .env" <nul
-)
-if not "%OTP_CHANNEL%"=="" (
-    ssh %SSH_OPTS% root@%PUBLIC_IP% "cd %REMOTE_DIR% && sed -i 's|^OTP_CHANNEL=.*|OTP_CHANNEL=%OTP_CHANNEL%|' .env" <nul
-)
-if not "%TELEGRAM_BOT_TOKEN%"=="" (
-    ssh %SSH_OPTS% root@%PUBLIC_IP% "cd %REMOTE_DIR% && sed -i 's|^TELEGRAM_BOT_TOKEN=.*|TELEGRAM_BOT_TOKEN=%TELEGRAM_BOT_TOKEN%|' .env" <nul
-)
-if not "%TELEGRAM_BOT_USERNAME%"=="" (
-    ssh %SSH_OPTS% root@%PUBLIC_IP% "cd %REMOTE_DIR% && sed -i 's|^TELEGRAM_BOT_USERNAME=.*|TELEGRAM_BOT_USERNAME=%TELEGRAM_BOT_USERNAME%|' .env" <nul
-)
-if not "%DOMAIN%"=="" (
-    ssh %SSH_OPTS% root@%PUBLIC_IP% "cd %REMOTE_DIR% && sed -i 's|^PUBLIC_URL=.*|PUBLIC_URL=https://%DOMAIN%|' .env" <nul
-)
-if not "%SMS_PROVIDER%"=="" (
-    ssh %SSH_OPTS% root@%PUBLIC_IP% "cd %REMOTE_DIR% && sed -i 's|^SMS_PROVIDER=.*|SMS_PROVIDER=%SMS_PROVIDER%|' .env" <nul
-)
-if not "%SMS_API_KEY%"=="" (
-    ssh %SSH_OPTS% root@%PUBLIC_IP% "cd %REMOTE_DIR% && sed -i 's|^SMS_API_KEY=.*|SMS_API_KEY=%SMS_API_KEY%|' .env" <nul
-)
-if not "%SMS_SENDER_ID%"=="" (
-    ssh %SSH_OPTS% root@%PUBLIC_IP% "cd %REMOTE_DIR% && sed -i 's|^SMS_SENDER_ID=.*|SMS_SENDER_ID=%SMS_SENDER_ID%|' .env" <nul
+call :ssh_pipe "%ENV_TMP%" "bash -s -- '%REMOTE_DIR%' '%ADMIN_PHONES%' '%OTP_CHANNEL%' '%TELEGRAM_BOT_TOKEN%' '%TELEGRAM_BOT_USERNAME%' '%SMS_PROVIDER%' '%SMS_API_KEY%' '%SMS_SENDER_ID%' '%DOMAIN%'"
+set ENV_RC=%ERRORLEVEL%
+del "%ENV_TMP%" 2>nul
+if not %ENV_RC% equ 0 (
+    echo [ERROR] Failed to configure remote .env - SSH error or sed failure.
+    echo         Nothing was started. Re-run sync.bat once the droplet is reachable.
+    exit /b 1
 )
 echo [OK] Environment ready.
 
@@ -128,7 +131,7 @@ echo [5/5] Starting containers...
 set REMOTE_CMD=cd %REMOTE_DIR% ^&^& docker compose up -d
 if %BUILD% equ 1 set REMOTE_CMD=!REMOTE_CMD! --build
 
-ssh %SSH_OPTS% root@%PUBLIC_IP% "!REMOTE_CMD!" <nul
+call :ssh_run "!REMOTE_CMD!"
 if %ERRORLEVEL% neq 0 (
     echo [ERROR] Remote deploy failed. Check the droplet:
     echo         ssh -i %KEY_FILE% root@%PUBLIC_IP%
@@ -141,15 +144,20 @@ if %BUILD% equ 1 echo [OK] Containers rebuilt.
 
 echo.
 echo [INFO] Container status:
-ssh %SSH_OPTS% root@%PUBLIC_IP% "cd %REMOTE_DIR% && docker compose ps" <nul
+call :ssh_run "cd %REMOTE_DIR% && docker compose ps"
 
 REM -- Quick tunnel URL (random *.trycloudflare.com) -------------------
+REM NOTE: a plain `sync.bat` does NOT recreate the quicktunnel container, so the
+REM URL is RETAINED across normal syncs. It only changes when the container is
+REM restarted/recreated (docker compose down/up, droplet reboot, or a compose
+REM change). We use `tail -1` so we print the CURRENT URL, not the first one ever
+REM logged (logs accumulate across restarts, so `head -1` could show a dead URL).
 set QUICK_URL=
 echo.
 echo [INFO] Waiting for the quick tunnel URL...
 for /l %%n in (1,1,15) do (
     if "!QUICK_URL!"=="" (
-        ssh %SSH_OPTS% root@%PUBLIC_IP% "cd %REMOTE_DIR% && docker compose logs quicktunnel | grep -o https://[a-z0-9-]*\.trycloudflare\.com | head -1" <nul > "%TEMP%\%PROJECT_NAME%-quick-url.txt" 2>nul
+        ssh %SSH_OPTS% root@%PUBLIC_IP% "cd %REMOTE_DIR% && docker compose logs quicktunnel | grep -o https://[a-z0-9-]*\.trycloudflare\.com | tail -1" <nul > "%TEMP%\%PROJECT_NAME%-quick-url.txt" 2>nul
         for /f "usebackq delims=" %%u in ("%TEMP%\%PROJECT_NAME%-quick-url.txt") do set QUICK_URL=%%u
         if "!QUICK_URL!"=="" ping -n 3 127.0.0.1 >nul 2>&1
     )
@@ -166,4 +174,33 @@ if not "!QUICK_URL!"=="" (
     echo        ssh -i %KEY_FILE% root@%PUBLIC_IP% "cd %REMOTE_DIR% && docker compose logs quicktunnel"
 )
 
+goto :sync_end
+
+REM -------------------------------------------------------------------
+REM  Retry helpers. Transient SSH failures are common, so retry a few
+REM  times before giving up. Both return 0 on success, 1 on final failure.
+REM -------------------------------------------------------------------
+:ssh_run
+set /a SSH_TRY=0
+:ssh_run_loop
+set /a SSH_TRY+=1
+ssh %SSH_OPTS% root@%PUBLIC_IP% %* <nul
+if %ERRORLEVEL% equ 0 exit /b 0
+if %SSH_TRY% geq %SSH_RETRIES% exit /b 1
+echo [WARN] SSH attempt %SSH_TRY%/%SSH_RETRIES% failed - retrying...
+ping -n 5 127.0.0.1 >nul
+goto :ssh_run_loop
+
+:ssh_pipe
+set /a SSH_TRY=0
+:ssh_pipe_loop
+set /a SSH_TRY+=1
+type "%~1" | ssh %SSH_OPTS% root@%PUBLIC_IP% %2
+if %ERRORLEVEL% equ 0 exit /b 0
+if %SSH_TRY% geq %SSH_RETRIES% exit /b 1
+echo [WARN] SSH attempt %SSH_TRY%/%SSH_RETRIES% failed - retrying...
+ping -n 5 127.0.0.1 >nul
+goto :ssh_pipe_loop
+
+:sync_end
 endlocal

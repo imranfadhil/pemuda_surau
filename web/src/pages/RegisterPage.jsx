@@ -123,7 +123,7 @@ export default function RegisterPage() {
             </div>
           </div>
           <div className="field">
-            <label htmlFor="address">Address (optional)</label>
+            <label htmlFor="address">Address</label>
             <input
               id="address"
               value={form.address}
