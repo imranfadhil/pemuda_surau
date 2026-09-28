@@ -71,7 +71,7 @@ export default function QuranPage() {
       if (!location) {
         setNotice('Getting location…');
         const pos = await getPosition();
-        location = { latitude: pos.latitude, longitude: pos.longitude };
+        location = { latitude: pos.latitude, longitude: pos.longitude, accuracy: pos.accuracy };
       }
 
       await api.logQuran({

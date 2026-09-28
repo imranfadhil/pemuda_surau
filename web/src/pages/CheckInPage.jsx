@@ -5,7 +5,7 @@ import { useAuth } from '../lib/auth.jsx';
 import {
   startCamera, stopCamera, captureDescriptor, loadModels, qualityMessage,
 } from '../lib/face.js';
-import { getPosition } from '../lib/geo.js';
+import { getAccuratePosition } from '../lib/geo.js';
 import { FaceTips, useFaceFeedback } from '../components/FaceTips.jsx';
 import { PRAYERS, PRAYER_LABELS } from '../lib/constants.js';
 
@@ -118,13 +118,20 @@ export default function CheckInPage() {
         return;
       }
       // The device must be at the surau; the server enforces the geofence.
+      // Wait for a reasonably accurate fix — a coarse Wi-Fi/cell position can be
+      // hundreds of metres off and would wrongly report the member as far away.
       setStatus('Getting location…');
-      const pos = await getPosition();
+      const pos = await getAccuratePosition({
+        desiredAccuracy: 50,
+        timeout: 15000,
+        onProgress: (acc) => setStatus(`Getting location… (±${Math.round(acc)} m)`),
+      });
       // The server infers the prayer from the current window.
       const payload = {
         descriptor: captured.descriptor,
         latitude: pos.latitude,
         longitude: pos.longitude,
+        accuracy: pos.accuracy,
       };
       if (!selfCheckIn) payload.forUserId = selected.id;
       setStatus('Verifying…');

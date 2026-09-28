@@ -19,6 +19,9 @@ const checkInSchema = z.object({
   descriptor: z.array(z.number()).length(128),
   latitude: z.number().optional().nullable(),
   longitude: z.number().optional().nullable(),
+  // Reported GPS accuracy in metres. Used to explain a failed geofence check
+  // honestly (a coarse fix is not evidence the member is far away).
+  accuracy: z.number().optional().nullable(),
   // Optional: check in on behalf of a dependent (child) managed by the caller.
   forUserId: z.string().uuid().optional(),
 });
@@ -27,6 +30,7 @@ const identifySchema = z.object({
   descriptor: z.array(z.number()).length(128),
   latitude: z.number().optional().nullable(),
   longitude: z.number().optional().nullable(),
+  accuracy: z.number().optional().nullable(),
 });
 
 function todayInTimezone() {
@@ -37,8 +41,13 @@ function todayInTimezone() {
 /**
  * Enforce the geofence when enabled. Throws a 403 with a helpful message
  * when the device is outside the surau's radius.
+ *
+ * `accuracy` (metres, from the browser) is used only to make the failure
+ * message honest: if the reported fix is coarser than the distance we measured,
+ * we cannot actually tell whether the member is inside the fence, so we say so
+ * instead of asserting a distance we do not trust.
  */
-function assertWithinGeofence(latitude, longitude) {
+function assertWithinGeofence(latitude, longitude, accuracy = null) {
   if (!config.geofence.enabled) return null;
   if (!isValidCoordinate(latitude, longitude)) {
     throw httpError(
@@ -52,6 +61,16 @@ function assertWithinGeofence(latitude, longitude) {
     radiusMeters: config.geofence.radiusMeters,
   });
   if (!ok) {
+    const acc = Number(accuracy);
+    // A fix whose error is comparable to (or larger than) the measured distance
+    // cannot distinguish "at the surau" from "far away".
+    if (Number.isFinite(acc) && acc > 0 && acc >= distance) {
+      throw httpError(
+        403,
+        `We could not confirm your location accurately enough (GPS accuracy about ` +
+          `${formatDistance(acc)}). Move outdoors or near a window and try again.`,
+      );
+    }
     throw httpError(
       403,
       `You must be at the surau to check in (you are about ${formatDistance(distance)} away).`,
@@ -119,12 +138,12 @@ router.post(
   asyncHandler(async (req, res) => {
     const parsed = identifySchema.safeParse(req.body);
     if (!parsed.success) throw httpError(400, 'Invalid identify payload');
-    const { descriptor, latitude, longitude } = parsed.data;
+    const { descriptor, latitude, longitude, accuracy } = parsed.data;
 
     if (!isValidDescriptor(descriptor)) throw httpError(400, 'Invalid face descriptor');
 
     // Staff must also be at the surau when scanning.
-    const distanceFromSurau = assertWithinGeofence(latitude, longitude);
+    const distanceFromSurau = assertWithinGeofence(latitude, longitude, accuracy);
 
     const { rows: candidates } = await query(
       `SELECT id, full_name, guardian_id, face_descriptor FROM users
@@ -179,12 +198,12 @@ router.post(
   asyncHandler(async (req, res) => {
     const parsed = checkInSchema.safeParse(req.body);
     if (!parsed.success) throw httpError(400, 'Invalid check-in payload');
-    const { descriptor, latitude, longitude, forUserId } = parsed.data;
+    const { descriptor, latitude, longitude, accuracy, forUserId } = parsed.data;
 
     if (!isValidDescriptor(descriptor)) throw httpError(400, 'Invalid face descriptor');
 
     // The device must be at the surau.
-    assertWithinGeofence(latitude, longitude);
+    assertWithinGeofence(latitude, longitude, accuracy);
 
     // A guardian may check in on behalf of a dependent (child) they manage.
     // The verified face must belong to that dependent.
@@ -262,6 +281,11 @@ router.post(
       attendance: rows[0],
       confidence: Number((1 - match.distance).toFixed(3)),
       distance: Number(match.distance.toFixed(3)),
+      // Diagnostics: how far the device reported being, and how precise that
+      // fix claimed to be. Useful when a member is at the surau but the
+      // geofence disagrees.
+      distanceFromSurau: distanceFromSurau ?? null,
+      accuracy: Number.isFinite(Number(accuracy)) ? Number(accuracy) : null,
     });
   }),
 );

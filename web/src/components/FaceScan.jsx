@@ -75,9 +75,15 @@ export default function FaceScan({ onConfirmed, onCancel }) {
         descriptor: shot.descriptor,
         latitude: pos.latitude,
         longitude: pos.longitude,
+        accuracy: pos.accuracy,
       });
 
-      setCaptured({ descriptor: shot.descriptor, latitude: pos.latitude, longitude: pos.longitude });
+      setCaptured({
+        descriptor: shot.descriptor,
+        latitude: pos.latitude,
+        longitude: pos.longitude,
+        accuracy: pos.accuracy,
+      });
       setSuggestion(res);
       setStatus('');
       stopCamera(streamRef.current);

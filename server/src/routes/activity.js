@@ -16,6 +16,8 @@ const verificationFields = {
   descriptor: z.array(z.number()).length(128).optional(),
   latitude: z.number().optional().nullable(),
   longitude: z.number().optional().nullable(),
+  // Reported GPS accuracy in metres (used only to explain a failed geofence).
+  accuracy: z.number().optional().nullable(),
 };
 
 const meritSchema = z.object({
@@ -43,8 +45,11 @@ function todayInTimezone() {
 /**
  * Enforce the geofence when enabled. Throws 403 when the device is outside
  * the surau's radius.
+ *
+ * `accuracy` (metres, from the browser) only affects the failure message: a fix
+ * coarser than the measured distance cannot prove the member is far away.
  */
-function assertWithinGeofence(latitude, longitude) {
+function assertWithinGeofence(latitude, longitude, accuracy = null) {
   if (!config.geofence.enabled) return null;
   if (!isValidCoordinate(latitude, longitude)) {
     throw httpError(
@@ -58,6 +63,14 @@ function assertWithinGeofence(latitude, longitude) {
     radiusMeters: config.geofence.radiusMeters,
   });
   if (!ok) {
+    const acc = Number(accuracy);
+    if (Number.isFinite(acc) && acc > 0 && acc >= distance) {
+      throw httpError(
+        403,
+        `We could not confirm your location accurately enough (GPS accuracy about ` +
+          `${formatDistance(acc)}). Move outdoors or near a window and try again.`,
+      );
+    }
     throw httpError(
       403,
       `You must be at the surau to record activity (you are about ${formatDistance(distance)} away).`,
@@ -162,13 +175,13 @@ router.post(
   asyncHandler(async (req, res) => {
     const parsed = meritSchema.safeParse(req.body);
     if (!parsed.success) throw httpError(400, 'Invalid merit data');
-    const { userId, points, reason, descriptor, latitude, longitude } = parsed.data;
+    const { userId, points, reason, descriptor, latitude, longitude, accuracy } = parsed.data;
 
     const { rows: userRows } = await query('SELECT id FROM users WHERE id = $1', [userId]);
     if (!userRows[0]) throw httpError(404, 'User not found');
 
     // The member must be present at the surau, and the scanned face must be theirs.
-    assertWithinGeofence(latitude, longitude);
+    assertWithinGeofence(latitude, longitude, accuracy);
     await assertFaceMatches(userId, descriptor);
 
     const { rows } = await query(
@@ -246,14 +259,14 @@ router.post(
   asyncHandler(async (req, res) => {
     const parsed = quranSchema.safeParse(req.body);
     if (!parsed.success) throw httpError(400, 'Invalid Quran log data');
-    const { kind, surah, juz, pages, note, forUserId, descriptor, latitude, longitude } =
+    const { kind, surah, juz, pages, note, forUserId, descriptor, latitude, longitude, accuracy } =
       parsed.data;
 
     const targetUserId = await resolveQuranTarget(req.user, forUserId);
 
     // Every Quran log must happen at the surau - whether a teacher is recording
     // for a member or a member is logging their own recitation.
-    assertWithinGeofence(latitude, longitude);
+    assertWithinGeofence(latitude, longitude, accuracy);
 
     // Rate limit: at most one log per member per cooldown window, so a member
     // can't inflate their score with rapid repeat submissions.
