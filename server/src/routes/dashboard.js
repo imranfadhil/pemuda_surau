@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { query } from '../db.js';
 import { requireAuth } from '../middleware/auth.js';
 import { asyncHandler } from '../middleware/errors.js';
+import { prayerPoints } from '../utils/scoring.js';
 
 const router = Router();
 
@@ -171,7 +172,15 @@ router.get(
        att AS (
          SELECT a.user_id,
                 COUNT(*)::int AS attendance,
-                COUNT(DISTINCT a.attendance_date)::int AS days_attended
+                COUNT(DISTINCT a.attendance_date)::int AS days_attended,
+                -- Points, not raw counts: Subuh 15, Isyak 10, the rest 5.
+                -- These numbers mirror server/src/utils/scoring.js and cannot be
+                -- bound as parameters inside a CASE expression.
+                COALESCE(SUM(CASE a.prayer
+                  WHEN 'subuh'   THEN 15
+                  WHEN 'isyak'   THEN 10
+                  ELSE 5
+                END), 0)::int AS attendance_points
          FROM attendance a, period p
          WHERE p.start_date IS NULL OR a.attendance_date >= p.start_date
          GROUP BY a.user_id
@@ -202,11 +211,16 @@ router.get(
               CASE WHEN u.phone IS NOT NULL THEN RIGHT(u.phone, 4) END AS phone_last4,
               COALESCE(att.attendance, 0) AS attendance,
               COALESCE(att.days_attended, 0) AS days_attended,
+              COALESCE(att.attendance_points, 0) AS attendance_points,
               COALESCE(rec.recitation, 0) AS recitation,
               COALESCE(mem.memorization, 0) AS memorization,
               COALESCE(mer.merits, 0) AS merits,
-              (COALESCE(att.attendance, 0) + COALESCE(rec.recitation, 0)
-               + COALESCE(mem.memorization, 0) + COALESCE(mer.merits, 0)) AS overall
+              -- Each Quran activity is worth 5 points.
+              (COALESCE(rec.recitation, 0) + COALESCE(mem.memorization, 0)) * 5 AS quran_points,
+              -- Overall is the sum of POINTS across every category.
+              (COALESCE(att.attendance_points, 0)
+               + (COALESCE(rec.recitation, 0) + COALESCE(mem.memorization, 0)) * 5
+               + COALESCE(mer.merits, 0)) AS overall
        FROM users u
        LEFT JOIN users g ON g.id = u.guardian_id
        LEFT JOIN att ON att.user_id = u.id
@@ -238,7 +252,10 @@ router.get(
     );
     const breakdown = Object.fromEntries(PRAYERS.map((p) => [p, 0]));
     for (const row of rows) breakdown[row.prayer] = row.count;
-    res.json({ breakdown });
+    // Points per prayer, so the profile can show what each check-in is worth.
+    const points = Object.fromEntries(PRAYERS.map((p) => [p, prayerPoints(p)]));
+    const totalPoints = PRAYERS.reduce((sum, p) => sum + breakdown[p] * points[p], 0);
+    res.json({ breakdown, points, totalPoints });
   }),
 );
 

@@ -25,6 +25,27 @@ export const PRAYERS = [
 
 export const PRAYER_LABELS = Object.fromEntries(PRAYERS.map((p) => [p.key, p.label]));
 
+// ---------------------------------------------------------------------------
+// Scoring rules. Mirrors server/src/utils/scoring.js — keep the two in sync.
+// The leaderboard ranks by POINTS, so a harder activity is worth more.
+// ---------------------------------------------------------------------------
+
+/** Points per prayer check-in. Subuh is hardest, so it is worth the most. */
+export const PRAYER_POINTS = {
+  subuh: 15,
+  zuhur: 5,
+  asar: 5,
+  maghrib: 5,
+  isyak: 10,
+};
+
+/** Points for each Quran activity (recitation or memorization). */
+export const QURAN_POINTS = 5;
+
+/** Allowed range for a single merit award. */
+export const MERIT_MIN_POINTS = 1;
+export const MERIT_MAX_POINTS = 10;
+
 // Roles and their capabilities. Mirrors server/src/utils/roles.js.
 export const ROLES = [
   { key: 'admin', label: 'Admin', description: 'Full access' },
@@ -62,12 +83,14 @@ export function can(user, capability) {
 }
 
 // Leaderboard categories. `key` maps to the score column returned by the API.
+// `unit` is the label shown under the score; `points` marks categories whose
+// score is already in points (so the UI can say "pts" rather than a raw count).
 export const CATEGORIES = [
-  { key: 'overall', label: 'Overall', icon: '⭐', unit: 'pts' },
-  { key: 'attendance', label: 'Attendance', icon: '🕌', unit: 'prayers' },
+  { key: 'overall', label: 'Overall', icon: '⭐', unit: 'pts', points: true },
+  { key: 'attendance', label: 'Attendance', icon: '🕌', unit: 'pts', points: true },
   { key: 'recitation', label: 'Recitation', icon: '📖', unit: 'sessions' },
   { key: 'memorization', label: 'Memorization', icon: '🧠', unit: 'sessions' },
-  { key: 'merits', label: 'Merits', icon: '🏅', unit: 'pts' },
+  { key: 'merits', label: 'Merits', icon: '🏅', unit: 'pts', points: true },
 ];
 
 export const CATEGORY_LABELS = Object.fromEntries(CATEGORIES.map((c) => [c.key, c.label]));

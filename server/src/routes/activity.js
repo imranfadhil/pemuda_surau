@@ -8,6 +8,7 @@ import { config } from '../config.js';
 import { roleHasCapability } from '../utils/roles.js';
 import { isValidDescriptor, findBestMatch } from '../utils/face.js';
 import { withinGeofence, isValidCoordinate, formatDistance } from '../utils/geo.js';
+import { MERIT_MIN_POINTS, MERIT_MAX_POINTS } from '../utils/scoring.js';
 
 const router = Router();
 
@@ -22,7 +23,7 @@ const verificationFields = {
 
 const meritSchema = z.object({
   userId: z.string().uuid(),
-  points: z.number().int().min(1).max(100),
+  points: z.number().int().min(MERIT_MIN_POINTS).max(MERIT_MAX_POINTS),
   reason: z.string().min(2).max(300),
   ...verificationFields,
 });
@@ -223,7 +224,21 @@ router.get(
     );
     const recitation = rows.filter((r) => r.kind === 'recitation').length;
     const memorization = rows.filter((r) => r.kind === 'memorization').length;
-    res.json({ recitation, memorization, logs: rows });
+
+    // A guardian also sees their dependents' logs, including the surah/juz/
+    // pages/note a teacher recorded — that detail is the whole point of the
+    // record for a parent, so it is returned in full.
+    const { rows: family } = await query(
+      `SELECT q.*, u.full_name, u.id AS member_id, l.full_name AS logged_by_name
+       FROM quran_logs q
+       JOIN users u ON u.id = q.user_id
+       LEFT JOIN users l ON l.id = q.logged_by
+       WHERE u.guardian_id = $1 OR u.co_guardian_id = $1
+       ORDER BY q.logged_date DESC, q.logged_at DESC LIMIT 50`,
+      [req.user.sub],
+    );
+
+    res.json({ recitation, memorization, logs: rows, family });
   }),
 );
 

@@ -3,7 +3,7 @@ import { api } from '../lib/api.js';
 import { useAuth } from '../lib/auth.jsx';
 import FaceScan from '../components/FaceScan.jsx';
 import MemberPicker from '../components/MemberPicker.jsx';
-import { formatDate, can } from '../lib/constants.js';
+import { formatDate, can, MERIT_MIN_POINTS, MERIT_MAX_POINTS } from '../lib/constants.js';
 
 /**
  * Merits page.
@@ -27,7 +27,6 @@ export default function MeritsPage() {
   const [proof, setProof] = useState(null);
 
   const [form, setForm] = useState({ userId: '', points: 5, reason: '' });
-
   function loadMine() {
     api.myMerits().then(setMine).catch((e) => setError(e.message));
   }
@@ -175,8 +174,8 @@ export default function MeritsPage() {
                 <label>Points</label>
                 <input
                   type="number"
-                  min="1"
-                  max="100"
+                  min={MERIT_MIN_POINTS}
+                  max={MERIT_MAX_POINTS}
                   value={form.points}
                   onChange={(e) => setForm({ ...form, points: e.target.value })}
                   required

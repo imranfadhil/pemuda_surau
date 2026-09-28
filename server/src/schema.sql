@@ -106,10 +106,11 @@ CREATE TABLE IF NOT EXISTS settings (
 -- ---------------------------------------------------------------------------
 
 -- Merits: points awarded by an admin for good behaviour / contributions.
+-- A single award is worth 1-10 points (see server/src/utils/scoring.js).
 CREATE TABLE IF NOT EXISTS merits (
   id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id    UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  points     INT NOT NULL DEFAULT 1 CHECK (points <> 0),
+  points     INT NOT NULL DEFAULT 1 CHECK (points BETWEEN 1 AND 10),
   reason     TEXT NOT NULL,
   awarded_by UUID REFERENCES users(id),
   awarded_at TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -173,6 +174,13 @@ ALTER TABLE attendance ADD CONSTRAINT attendance_verified_by_fkey
 ALTER TABLE merits DROP CONSTRAINT IF EXISTS merits_awarded_by_fkey;
 ALTER TABLE merits ADD CONSTRAINT merits_awarded_by_fkey
   FOREIGN KEY (awarded_by) REFERENCES users(id) ON DELETE SET NULL;
+
+-- A single merit award is worth 1-10 points (see utils/scoring.js). The original
+-- constraint only rejected 0, so tighten it for existing databases. Any legacy
+-- row outside the range is clamped first, otherwise ADD CONSTRAINT would fail.
+UPDATE merits SET points = LEAST(GREATEST(points, 1), 10) WHERE points < 1 OR points > 10;
+ALTER TABLE merits DROP CONSTRAINT IF EXISTS merits_points_check;
+ALTER TABLE merits ADD CONSTRAINT merits_points_check CHECK (points BETWEEN 1 AND 10);
 
 ALTER TABLE programs DROP CONSTRAINT IF EXISTS programs_created_by_fkey;
 ALTER TABLE programs ADD CONSTRAINT programs_created_by_fkey
