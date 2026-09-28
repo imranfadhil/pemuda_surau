@@ -35,3 +35,20 @@ export const MERIT_MAX_POINTS = 10;
 export function prayerPoints(prayer) {
   return PRAYER_POINTS[prayer] ?? PRAYER_POINTS.zuhur;
 }
+
+/**
+ * SQL predicate that keeps only YOUTH members (younger than `maxAge`).
+ *
+ * The programme is for youth, so dashboard stats and the leaderboard must not
+ * be skewed by adult accounts (teachers, AJK, parents). Age is derived from
+ * `birth_date`; a member with no birth date is EXCLUDED, because we cannot
+ * prove they are a youth.
+ *
+ * `alias` is the users-table alias in the surrounding query (e.g. `u`).
+ * `maxAge` is interpolated as a validated integer — it comes from config, never
+ * from user input, so this is not an injection risk.
+ */
+export function youthOnlySql(alias = 'u', maxAge = 19) {
+  const age = Number.isFinite(Number(maxAge)) ? Math.trunc(Number(maxAge)) : 19;
+  return `${alias}.birth_date IS NOT NULL AND ${alias}.birth_date > CURRENT_DATE - INTERVAL '${age} years'`;
+}

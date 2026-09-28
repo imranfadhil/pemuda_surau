@@ -1055,7 +1055,12 @@ paths:
     get:
       tags: [Dashboard]
       summary: Leaderboard
-      description: Public.
+      description: |
+        Public. Ranks members by POINTS (Subuh 15, Isyak 10, other prayers 5,
+        each Quran activity 5, merits 1-10).
+
+        **Youth only** — members aged 19 or over (and members with no birth
+        date) are excluded, so adult/committee accounts do not skew the board.
       security: []
       parameters:
         - name: period
@@ -1104,6 +1109,37 @@ paths:
                   breakdown:
                     type: object
                     additionalProperties: { type: integer }
+                  points:
+                    type: object
+                    additionalProperties: { type: integer }
+                  totalPoints: { type: integer }
+
+  /dashboard/me/scores:
+    get:
+      tags: [Dashboard]
+      summary: My own scores
+      description: |
+        The caller's own scores in the same shape as a leaderboard row. Unlike
+        the leaderboard this is NOT age-filtered, so an adult member (teacher,
+        AJK, parent) still sees their own badges on the profile page.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  scores:
+                    type: object
+                    properties:
+                      attendance: { type: integer }
+                      days_attended: { type: integer }
+                      attendance_points: { type: integer }
+                      recitation: { type: integer }
+                      memorization: { type: integer }
+                      merits: { type: integer }
+                      overall: { type: integer }
 
   # -------------------------------------------------------------- Programs
   /programs:

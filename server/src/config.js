@@ -60,6 +60,12 @@ export const config = {
   quran: {
     cooldownMinutes: Number(process.env.QURAN_LOG_COOLDOWN_MINUTES || 60),
   },
+  // The programme is for YOUTH. Dashboard stats and the leaderboard only count
+  // members younger than this age, so adult/committee accounts (teachers, AJK,
+  // parents) do not skew the numbers. Age is derived from `birth_date`.
+  dashboard: {
+    maxAge: Number(process.env.DASHBOARD_MAX_AGE || 19),
+  },
   // How OTP codes are delivered: telegram | sms | console
   otpChannel: process.env.OTP_CHANNEL || 'console',
   // Public base URL of the app (used for Telegram webhook registration)

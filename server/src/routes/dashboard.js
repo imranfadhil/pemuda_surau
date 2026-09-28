@@ -2,11 +2,16 @@ import { Router } from 'express';
 import { query } from '../db.js';
 import { requireAuth } from '../middleware/auth.js';
 import { asyncHandler } from '../middleware/errors.js';
-import { prayerPoints } from '../utils/scoring.js';
+import { prayerPoints, youthOnlySql } from '../utils/scoring.js';
+import { config } from '../config.js';
 
 const router = Router();
 
 const PRAYERS = ['subuh', 'zuhur', 'asar', 'maghrib', 'isyak'];
+
+// The programme is for youth, so stats and rankings only count members younger
+// than this age. Adult accounts (teachers, AJK, parents) are excluded.
+const YOUTH = youthOnlySql('u', config.dashboard.maxAge);
 
 // Whitelisted leaderboard categories -> score column.
 const CATEGORY_COLUMNS = {
@@ -30,21 +35,37 @@ router.get(
     const today = new Date().toISOString().slice(0, 10);
 
     const [members, total, todayRows, weekRows, meritRows, quranRows] = await Promise.all([
-      query(`SELECT COUNT(*)::int AS count FROM users WHERE is_active = TRUE`),
-      query(`SELECT COUNT(*)::int AS count FROM attendance`),
+      query(`SELECT COUNT(*)::int AS count FROM users u WHERE u.is_active = TRUE AND ${YOUTH}`),
       query(
-        `SELECT prayer, COUNT(*)::int AS count FROM attendance
-         WHERE attendance_date = $1 GROUP BY prayer`,
+        `SELECT COUNT(*)::int AS count FROM attendance a
+         JOIN users u ON u.id = a.user_id
+         WHERE ${YOUTH}`,
+      ),
+      query(
+        `SELECT a.prayer, COUNT(*)::int AS count FROM attendance a
+         JOIN users u ON u.id = a.user_id
+         WHERE a.attendance_date = $1 AND ${YOUTH}
+         GROUP BY a.prayer`,
         [today],
       ),
       query(
-        `SELECT attendance_date, COUNT(*)::int AS count FROM attendance
-         WHERE attendance_date >= $1::date - INTERVAL '6 days'
-         GROUP BY attendance_date ORDER BY attendance_date`,
+        `SELECT a.attendance_date, COUNT(*)::int AS count FROM attendance a
+         JOIN users u ON u.id = a.user_id
+         WHERE a.attendance_date >= $1::date - INTERVAL '6 days' AND ${YOUTH}
+         GROUP BY a.attendance_date ORDER BY a.attendance_date`,
         [today],
       ),
-      query(`SELECT COALESCE(SUM(points), 0)::int AS total FROM merits`),
-      query(`SELECT kind, COUNT(*)::int AS count FROM quran_logs GROUP BY kind`),
+      query(
+        `SELECT COALESCE(SUM(m.points), 0)::int AS total FROM merits m
+         JOIN users u ON u.id = m.user_id
+         WHERE ${YOUTH}`,
+      ),
+      query(
+        `SELECT q.kind, COUNT(*)::int AS count FROM quran_logs q
+         JOIN users u ON u.id = q.user_id
+         WHERE ${YOUTH}
+         GROUP BY q.kind`,
+      ),
     ]);
 
     const todayByPrayer = Object.fromEntries(PRAYERS.map((p) => [p, 0]));
@@ -78,34 +99,40 @@ router.get(
          SELECT generate_series(CURRENT_DATE - INTERVAL '6 days', CURRENT_DATE, '1 day')::date AS day
        ),
        att AS (
-         SELECT attendance_date AS day,
-                COUNT(*) FILTER (WHERE prayer = 'subuh')::int   AS subuh,
-                COUNT(*) FILTER (WHERE prayer = 'zuhur')::int   AS zuhur,
-                COUNT(*) FILTER (WHERE prayer = 'asar')::int    AS asar,
-                COUNT(*) FILTER (WHERE prayer = 'maghrib')::int AS maghrib,
-                COUNT(*) FILTER (WHERE prayer = 'isyak')::int   AS isyak,
+         SELECT a.attendance_date AS day,
+                COUNT(*) FILTER (WHERE a.prayer = 'subuh')::int   AS subuh,
+                COUNT(*) FILTER (WHERE a.prayer = 'zuhur')::int   AS zuhur,
+                COUNT(*) FILTER (WHERE a.prayer = 'asar')::int    AS asar,
+                COUNT(*) FILTER (WHERE a.prayer = 'maghrib')::int AS maghrib,
+                COUNT(*) FILTER (WHERE a.prayer = 'isyak')::int   AS isyak,
                 COUNT(*)::int AS attendance
-         FROM attendance
-         WHERE attendance_date >= CURRENT_DATE - INTERVAL '6 days'
-         GROUP BY attendance_date
+         FROM attendance a
+         JOIN users u ON u.id = a.user_id
+         WHERE a.attendance_date >= CURRENT_DATE - INTERVAL '6 days' AND ${YOUTH}
+         GROUP BY a.attendance_date
        ),
        rec AS (
-         SELECT logged_date AS day, COUNT(*)::int AS recitation
-         FROM quran_logs
-         WHERE kind = 'recitation' AND logged_date >= CURRENT_DATE - INTERVAL '6 days'
-         GROUP BY logged_date
+         SELECT q.logged_date AS day, COUNT(*)::int AS recitation
+         FROM quran_logs q
+         JOIN users u ON u.id = q.user_id
+         WHERE q.kind = 'recitation' AND q.logged_date >= CURRENT_DATE - INTERVAL '6 days'
+           AND ${YOUTH}
+         GROUP BY q.logged_date
        ),
        mem AS (
-         SELECT logged_date AS day, COUNT(*)::int AS memorization
-         FROM quran_logs
-         WHERE kind = 'memorization' AND logged_date >= CURRENT_DATE - INTERVAL '6 days'
-         GROUP BY logged_date
+         SELECT q.logged_date AS day, COUNT(*)::int AS memorization
+         FROM quran_logs q
+         JOIN users u ON u.id = q.user_id
+         WHERE q.kind = 'memorization' AND q.logged_date >= CURRENT_DATE - INTERVAL '6 days'
+           AND ${YOUTH}
+         GROUP BY q.logged_date
        ),
        mer AS (
-         SELECT awarded_at::date AS day, COALESCE(SUM(points), 0)::int AS merits
-         FROM merits
-         WHERE awarded_at >= CURRENT_DATE - INTERVAL '6 days'
-         GROUP BY awarded_at::date
+         SELECT m.awarded_at::date AS day, COALESCE(SUM(m.points), 0)::int AS merits
+         FROM merits m
+         JOIN users u ON u.id = m.user_id
+         WHERE m.awarded_at >= CURRENT_DATE - INTERVAL '6 days' AND ${YOUTH}
+         GROUP BY m.awarded_at::date
        )
        SELECT d.day,
               COALESCE(att.subuh, 0)        AS subuh,
@@ -227,7 +254,7 @@ router.get(
        LEFT JOIN rec ON rec.user_id = u.id
        LEFT JOIN mem ON mem.user_id = u.id
        LEFT JOIN mer ON mer.user_id = u.id
-       WHERE u.is_active = TRUE
+       WHERE u.is_active = TRUE AND ${YOUTH}
        ORDER BY ${orderColumn} DESC, attendance DESC, u.full_name ASC
        LIMIT 100`,
       [period],
@@ -235,6 +262,52 @@ router.get(
 
     const ranked = rows.map((row, index) => ({ rank: index + 1, ...row }));
     res.json({ period, category, leaderboard: ranked });
+  }),
+);
+
+/**
+ * The current user's OWN scores, in the same shape as a leaderboard row.
+ *
+ * The leaderboard is youth-only, so an adult member (teacher, AJK, parent)
+ * would not appear in it — and would therefore lose their own badges. This
+ * endpoint returns their personal scores regardless of age, so the profile page
+ * always works.
+ */
+router.get(
+  '/me/scores',
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const { rows } = await query(
+      `WITH att AS (
+         SELECT COUNT(*)::int AS attendance,
+                COUNT(DISTINCT attendance_date)::int AS days_attended,
+                COALESCE(SUM(CASE prayer
+                  WHEN 'subuh' THEN 15
+                  WHEN 'isyak' THEN 10
+                  ELSE 5
+                END), 0)::int AS attendance_points
+         FROM attendance WHERE user_id = $1
+       ),
+       rec AS (
+         SELECT COUNT(*)::int AS recitation FROM quran_logs
+         WHERE user_id = $1 AND kind = 'recitation'
+       ),
+       mem AS (
+         SELECT COUNT(*)::int AS memorization FROM quran_logs
+         WHERE user_id = $1 AND kind = 'memorization'
+       ),
+       mer AS (
+         SELECT COALESCE(SUM(points), 0)::int AS merits FROM merits WHERE user_id = $1
+       )
+       SELECT att.attendance, att.days_attended, att.attendance_points,
+              rec.recitation, mem.memorization, mer.merits,
+              (att.attendance_points
+               + (rec.recitation + mem.memorization) * 5
+               + mer.merits) AS overall
+       FROM att, rec, mem, mer`,
+      [req.user.sub],
+    );
+    res.json({ scores: rows[0] });
   }),
 );
 

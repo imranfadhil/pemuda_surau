@@ -47,6 +47,20 @@ The rules live in `server/src/utils/scoring.js` and are mirrored in
 hard-codes the same numbers (they cannot be bound as parameters inside a `CASE` expression),
 so **update all three together** if the values change.
 
+### Youth-only stats
+
+The programme is for youth, so the **dashboard stats, the weekly chart and the leaderboard
+only count members younger than 19**. Adult accounts (teachers, AJK, parents) are excluded so
+they do not skew the numbers. Age is derived from `birth_date`; a member with **no birth date
+is excluded**, because we cannot prove they are a youth.
+
+The threshold is configurable via `DASHBOARD_MAX_AGE` (default `19`). The filter is built by
+`youthOnlySql()` in `server/src/utils/scoring.js`.
+
+> **Note:** the profile page's "Your badges" card uses `GET /api/dashboard/me/scores`, which is
+> **not** age-filtered — otherwise an adult member would not appear in the leaderboard and
+> would lose their own badges.
+
 ## Architecture
 
 ```

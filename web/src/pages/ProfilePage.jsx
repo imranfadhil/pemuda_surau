@@ -7,17 +7,17 @@ import { PRAYER_LABELS, formatDate, SURAU, CATEGORIES, badgeFor, ROLE_LABELS } f
 import { ageLabel } from '../lib/age.js';
 
 function BadgesCard() {
-  const [leaders, setLeaders] = useState([]);
-  const { user } = useAuth();
+  const [scores, setScores] = useState(null);
 
   useEffect(() => {
+    // Use the personal scores endpoint, NOT the leaderboard: the leaderboard is
+    // youth-only, so an adult member would not appear in it and would lose
+    // their own badges.
     api
-      .leaderboard('all', 'overall')
-      .then((d) => setLeaders(d.leaderboard))
+      .myScores()
+      .then((d) => setScores(d.scores))
       .catch(() => {});
   }, []);
-
-  const me = leaders.find((r) => r.id === user?.id);
 
   return (
     <div className="card">
@@ -25,11 +25,11 @@ function BadgesCard() {
       <p className="muted" style={{ marginBottom: 12 }}>
         Earned from your all-time activity in each category.
       </p>
-      {!me ? (
+      {!scores ? (
         <p className="muted">No activity yet — start checking in and logging Quran activity.</p>
       ) : (
         CATEGORIES.filter((c) => c.key !== 'overall').map((c) => {
-          const score = me[c.key] ?? 0;
+          const score = scores[c.key] ?? 0;
           const badge = badgeFor(score);
           return (
             <div key={c.key} className="leader-row">

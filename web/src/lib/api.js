@@ -85,6 +85,7 @@ export const api = {
   leaderboard: (period = 'all', category = 'overall') =>
     request(`/dashboard/leaderboard?period=${period}&category=${category}`),
   myBreakdown: () => request('/dashboard/me/breakdown'),
+  myScores: () => request('/dashboard/me/scores'),
 
   myMerits: () => request('/activity/merits/me'),
   listMerits: () => request('/activity/merits'),
