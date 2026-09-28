@@ -341,6 +341,69 @@ textarea:focus {
   color: var(--slate-800);
 }
 
+/* ---- Member picker (searchable select) ---- */
+.member-picker {
+  position: relative;
+}
+
+.member-picker input {
+  width: 100%;
+}
+
+.member-picker-list {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  max-height: 260px;
+  overflow-y: auto;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  background: white;
+  border: 1px solid var(--slate-200);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+}
+
+.member-picker-opt {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 9px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.member-picker-opt.active {
+  background: var(--teal-50);
+}
+
+.member-picker-opt.selected .member-picker-name {
+  font-weight: 700;
+  color: var(--teal-700);
+}
+
+.member-picker-name {
+  font-weight: 600;
+}
+
+.member-picker-sub {
+  font-size: 0.75rem;
+  color: var(--slate-600);
+  white-space: nowrap;
+}
+
+.member-picker-empty {
+  padding: 12px 10px;
+  font-size: 0.85rem;
+  color: var(--slate-600);
+  text-align: center;
+}
+
 /* ---- Alerts ---- */
 .alert {
   padding: 12px 14px;

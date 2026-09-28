@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { api } from '../lib/api.js';
 import { useAuth } from '../lib/auth.jsx';
 import FaceScan from '../components/FaceScan.jsx';
+import MemberPicker from '../components/MemberPicker.jsx';
 import { getPosition } from '../lib/geo.js';
 import { formatDate, can } from '../lib/constants.js';
 
@@ -170,22 +171,24 @@ export default function QuranPage() {
             )}
             <div className="field">
               <label>Member</label>
-              <select
+              <MemberPicker
                 value={form.userId}
-                onChange={(e) => {
-                  setForm({ ...form, userId: e.target.value });
+                emptyLabel={`Myself (${user?.fullName})`}
+                placeholder="Search a member…"
+                noResultsLabel="No members match that name."
+                onChange={(id) => {
+                  setForm({ ...form, userId: id });
                   setProof(null);
                 }}
-              >
-                <option value="">Myself ({user?.fullName})</option>
-                {members
+                options={members
                   .filter((m) => m.id !== user?.id)
-                  .map((m) => (
-                    <option key={m.id} value={m.id}>
-                      {m.fullName} {m.isDependent ? '(child)' : ''}
-                    </option>
-                  ))}
-              </select>
+                  .map((m) => ({
+                    value: m.id,
+                    label: m.fullName,
+                    sublabel: m.isDependent ? 'child' : '',
+                    searchText: [m.phone, m.isDependent ? 'child' : ''].filter(Boolean).join(' '),
+                  }))}
+              />
             </div>
           </>
         )}

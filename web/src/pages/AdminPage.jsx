@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { api } from '../lib/api.js';
 import { useAuth } from '../lib/auth.jsx';
 import DataTable from '../components/DataTable.jsx';
+import MemberPicker from '../components/MemberPicker.jsx';
 import {
   PRAYERS, PRAYER_LABELS, todayISO, formatDate, formatDateTime, ROLES, ROLE_LABELS, can,
 } from '../lib/constants.js';
@@ -79,6 +80,10 @@ export default function AdminPage() {
     e.preventDefault();
     setError('');
     setNotice('');
+    if (!manual.userId) {
+      setError('Please choose a member.');
+      return;
+    }
     try {
       await api.manualCheckIn(manual);
       setNotice('Manual check-in recorded.');
@@ -345,18 +350,21 @@ export default function AdminPage() {
           </p>
           <div className="field">
             <label>Member</label>
-            <select
+            <MemberPicker
               value={manual.userId}
-              onChange={(e) => setManual({ ...manual, userId: e.target.value })}
-              required
-            >
-              <option value="">Select member…</option>
-              {users.map((u) => (
-                <option key={u.id} value={u.id}>
-                  {u.fullName} {u.phone ? `(${u.phone})` : '(dependent)'}
-                </option>
-              ))}
-            </select>
+              emptyLabel="Select member…"
+              placeholder="Search a member…"
+              noResultsLabel="No members match that name."
+              onChange={(id) => setManual({ ...manual, userId: id })}
+              options={users.map((u) => ({
+                value: u.id,
+                label: u.fullName,
+                sublabel: u.phone || 'dependent',
+                searchText: [u.phone, u.guardianName, u.isDependent ? 'dependent child' : '']
+                  .filter(Boolean)
+                  .join(' '),
+              }))}
+            />
           </div>
           <div className="row">
             <div className="field" style={{ flex: 1 }}>

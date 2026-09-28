@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { api } from '../lib/api.js';
 import { useAuth } from '../lib/auth.jsx';
 import FaceScan from '../components/FaceScan.jsx';
+import MemberPicker from '../components/MemberPicker.jsx';
 import { formatDate, can } from '../lib/constants.js';
 
 /**
@@ -49,6 +50,10 @@ export default function MeritsPage() {
     e.preventDefault();
     setError('');
     setNotice('');
+    if (!form.userId) {
+      setError('Please choose a member to award merits to.');
+      return;
+    }
     setBusy(true);
     try {
       await api.awardMerit({
@@ -142,21 +147,22 @@ export default function MeritsPage() {
 
             <div className="field">
               <label>Member</label>
-              <select
+              <MemberPicker
                 value={form.userId}
-                onChange={(e) => {
-                  setForm({ ...form, userId: e.target.value });
+                emptyLabel="Select member…"
+                placeholder="Search a member…"
+                noResultsLabel="No members match that name."
+                onChange={(id) => {
+                  setForm({ ...form, userId: id });
                   setProof(null);
                 }}
-                required
-              >
-                <option value="">Select member…</option>
-                {members.map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.fullName} {m.isDependent ? '(child)' : ''}
-                  </option>
-                ))}
-              </select>
+                options={members.map((m) => ({
+                  value: m.id,
+                  label: m.fullName,
+                  sublabel: m.isDependent ? 'child' : '',
+                  searchText: [m.phone, m.isDependent ? 'child' : ''].filter(Boolean).join(' '),
+                }))}
+              />
             </div>
 
             <div className="row">
