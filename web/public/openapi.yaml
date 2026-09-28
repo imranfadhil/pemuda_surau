@@ -1,0 +1,1179 @@
+openapi: 3.0.3
+
+info:
+  title: Pemuda Surau Al-Abqori API
+  version: 1.0.0
+  description: |
+    REST API for the Surau Al-Abqori youth programme: prayer attendance
+    (face-verified + geofenced), Quran activity, merits, programs and the
+    public dashboard.
+
+    ## Authentication
+    Most endpoints require a JWT obtained from `POST /api/auth/verify-otp`.
+    Send it as `Authorization: Bearer <token>`.
+
+    ## Authorisation
+    Beyond "logged in", endpoints are gated by **capabilities** rather than raw
+    roles (see `server/src/utils/roles.js`). Admins implicitly hold every
+    capability. The `x-capability` extension on each operation records the
+    requirement.
+
+    ## Geofencing
+    Check-in, activity recording and new registrations are only accepted within
+    a radius of the surau. Coordinates are supplied by the client.
+
+servers:
+  - url: /api
+    description: Same origin (proxied by Nginx / the Vite dev server)
+
+tags:
+  - name: Auth
+    description: Login, OTP and the current profile
+  - name: Users
+    description: Profiles, face enrollment, dependents and member administration
+  - name: Attendance
+    description: Prayer check-in and attendance history
+  - name: Activity
+    description: Quran recitation/memorization and merits
+  - name: Dashboard
+    description: Public stats, weekly activity and leaderboards
+  - name: Programs
+    description: Surau programs and sign-ups
+  - name: Telegram
+    description: Telegram account linking (used for free OTP delivery)
+  - name: System
+    description: Health and diagnostics
+
+security:
+  - bearerAuth: []
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          example: Authentication required
+        code:
+          type: string
+          description: Optional machine-readable code (e.g. REGISTRATION_TOO_FAR).
+          example: REGISTRATION_TOO_FAR
+        retryAfterMinutes:
+          type: integer
+          description: Present on 429 responses (e.g. the Quran log cooldown).
+
+    User:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        phone: { type: string, nullable: true, example: '+60123456789' }
+        fullName: { type: string, example: Ahmad bin Zainal }
+        birthDate: { type: string, format: date, nullable: true }
+        age: { type: integer, nullable: true, example: 17 }
+        gender: { type: string, nullable: true, enum: [male, female] }
+        address: { type: string, nullable: true }
+        role: { type: string, enum: [youth, admin, parent, teacher, ajk] }
+        capabilities:
+          type: array
+          items: { type: string }
+          example: [checkIn, viewMembers]
+        hasFace: { type: boolean }
+        telegramLinked: { type: boolean }
+        guardianId: { type: string, format: uuid, nullable: true }
+        isDependent: { type: boolean }
+        canSelfCheckIn: { type: boolean }
+        createdAt: { type: string, format: date-time }
+
+    Descriptor:
+      type: array
+      description: 128-float face descriptor produced by face-api.js in the browser.
+      items: { type: number }
+      minItems: 128
+      maxItems: 128
+
+    Attendance:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        user_id: { type: string, format: uuid }
+        prayer: { type: string, enum: [subuh, zuhur, asar, maghrib, isyak] }
+        attendance_date: { type: string, format: date }
+        checked_in_at: { type: string, format: date-time }
+        method: { type: string, enum: [face, manual] }
+        face_score: { type: number, nullable: true }
+        latitude: { type: number, nullable: true }
+        longitude: { type: number, nullable: true }
+
+    PrayerWindow:
+      type: object
+      nullable: true
+      properties:
+        prayer: { type: string, enum: [subuh, zuhur, asar, maghrib, isyak] }
+        adhan: { type: string, format: date-time }
+        start: { type: string, format: date-time }
+        end: { type: string, format: date-time }
+
+    Merit:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        user_id: { type: string, format: uuid }
+        points: { type: integer }
+        reason: { type: string, nullable: true }
+        awarded_by: { type: string, format: uuid, nullable: true }
+        awarded_by_name: { type: string, nullable: true }
+        awarded_at: { type: string, format: date-time }
+
+    QuranLog:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        user_id: { type: string, format: uuid }
+        kind: { type: string, enum: [recitation, memorization] }
+        surah: { type: string, nullable: true }
+        juz: { type: integer, nullable: true }
+        pages: { type: integer, nullable: true }
+        note: { type: string, nullable: true }
+        logged_by: { type: string, format: uuid, nullable: true }
+        logged_by_name: { type: string, nullable: true }
+        logged_date: { type: string, format: date }
+        logged_at: { type: string, format: date-time }
+
+    ProgramInput:
+      type: object
+      required: [title, startsAt]
+      properties:
+        title: { type: string }
+        description: { type: string, nullable: true }
+        location: { type: string, nullable: true }
+        startsAt: { type: string, format: date-time }
+        endsAt: { type: string, format: date-time, nullable: true }
+
+  parameters:
+    Id:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+
+  responses:
+    BadRequest:
+      description: Invalid request payload.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Unauthorized:
+      description: Missing or invalid token.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Forbidden:
+      description: Authenticated but lacking the required capability.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    NotFound:
+      description: Not found.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    TooManyRequests:
+      description: Rate limited.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+
+paths:
+  # ------------------------------------------------------------------ Auth
+  /auth/login-options:
+    get:
+      tags: [Auth]
+      summary: Available login channels
+      description: Public. Reports whether Telegram/SMS are configured.
+      security: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  telegram:
+                    type: object
+                    properties:
+                      available: { type: boolean }
+                      botUrl: { type: string, nullable: true }
+                      botUsername: { type: string, nullable: true }
+                  sms:
+                    type: object
+                    properties:
+                      available: { type: boolean }
+                  adminAssisted: { type: boolean }
+
+  /auth/request-otp:
+    post:
+      tags: [Auth]
+      summary: Send a login code to a phone
+      description: |
+        Public. Rate limited (10 requests / 10 minutes). Delivery prefers the
+        user's linked Telegram chat, then SMS, then the server console.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [phone]
+              properties:
+                phone: { type: string, example: '0123456789' }
+      responses:
+        '200':
+          description: Code dispatched
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  channel: { type: string, enum: [telegram, sms, console] }
+                  needsAdminHelp: { type: boolean }
+                  telegramAvailable: { type: boolean }
+                  telegramLinked: { type: boolean }
+                  botUrl: { type: string }
+                  devCode:
+                    type: string
+                    description: Only returned when NODE_ENV is not production.
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+
+  /auth/verify-otp:
+    post:
+      tags: [Auth]
+      summary: Verify a code and receive a JWT
+      description: |
+        Public. Creates the account if the phone is new — in which case the
+        request must come from within the registration radius of the surau
+        (default 1.5 km), so `latitude`/`longitude` are required for new users.
+        Existing members may log in from anywhere.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [phone, code]
+              properties:
+                phone: { type: string }
+                code: { type: string, example: '123456' }
+                latitude: { type: number, description: Required only for a NEW account. }
+                longitude: { type: number, description: Required only for a NEW account. }
+      responses:
+        '200':
+          description: Authenticated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token: { type: string }
+                  user: { $ref: '#/components/schemas/User' }
+                  isNewUser: { type: boolean }
+                  needsProfile: { type: boolean }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403':
+          description: |
+            Deactivated account, a phone-less dependent account, or a new
+            registration outside the allowed area (`code` is
+            `REGISTRATION_TOO_FAR` / `REGISTRATION_LOCATION_REQUIRED`).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /auth/me:
+    get:
+      tags: [Auth]
+      summary: Current user profile
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user: { $ref: '#/components/schemas/User' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  # ----------------------------------------------------------------- Users
+  /users/me:
+    put:
+      tags: [Users]
+      summary: Update own profile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [fullName]
+              properties:
+                fullName: { type: string }
+                birthDate: { type: string, format: date, nullable: true }
+                gender: { type: string, enum: [male, female], nullable: true }
+                address: { type: string, nullable: true }
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user: { $ref: '#/components/schemas/User' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  /users/me/face:
+    post:
+      tags: [Users]
+      summary: Enroll (or re-enroll) own face
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [descriptor]
+              properties:
+                descriptor: { $ref: '#/components/schemas/Descriptor' }
+      responses:
+        '200':
+          description: Enrolled
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  user: { $ref: '#/components/schemas/User' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  /users/me/dependents:
+    get:
+      tags: [Users]
+      summary: List my dependents (children)
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  dependents:
+                    type: array
+                    items: { $ref: '#/components/schemas/User' }
+    post:
+      tags: [Users]
+      summary: Add a dependent
+      description: Dependents have no phone and cannot log in until given one.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [fullName]
+              properties:
+                fullName: { type: string }
+                birthDate: { type: string, format: date, nullable: true }
+                gender: { type: string, enum: [male, female], nullable: true }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  dependent: { $ref: '#/components/schemas/User' }
+
+  /users/me/dependents/{id}:
+    put:
+      tags: [Users]
+      summary: Update a dependent
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [fullName]
+              properties:
+                fullName: { type: string }
+                birthDate: { type: string, format: date, nullable: true }
+                gender: { type: string, enum: [male, female], nullable: true }
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  dependent: { $ref: '#/components/schemas/User' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [Users]
+      summary: Remove a dependent
+      description: Cascades to their attendance, Quran logs and merits.
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '200': { description: Removed }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /users/me/dependents/{id}/face:
+    post:
+      tags: [Users]
+      summary: Enroll a dependent's face
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [descriptor]
+              properties:
+                descriptor: { $ref: '#/components/schemas/Descriptor' }
+      responses:
+        '200': { description: Enrolled }
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  /users/me/dependents/{id}/phone:
+    post:
+      tags: [Users]
+      summary: Give a dependent their own login
+      description: |
+        Sets a phone number on the existing dependent row so they can log in and
+        check themselves in. History and the enrolled face are preserved, and
+        the guardian link is kept. Guardians may do this for their own
+        dependents; admins may do it for any dependent.
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [phone]
+              properties:
+                phone: { type: string, example: '0123456789' }
+      responses:
+        '200':
+          description: Promoted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  dependent: { $ref: '#/components/schemas/User' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: That phone number is already registered to another account.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /users:
+    get:
+      tags: [Users]
+      summary: List all members
+      description: Requires the `viewMembers` capability (teachers/AJK need it to pick a member).
+      x-capability: viewMembers
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  users:
+                    type: array
+                    items:
+                      allOf:
+                        - $ref: '#/components/schemas/User'
+                        - type: object
+                          properties:
+                            guardianName: { type: string, nullable: true }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /users/{id}/role:
+    patch:
+      tags: [Users]
+      summary: Change a member's role
+      description: Admin only. Dependents inherit their guardian's role and cannot be changed.
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [role]
+              properties:
+                role: { type: string, enum: [youth, admin, parent, teacher, ajk] }
+      responses:
+        '200': { description: Updated }
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  /users/{id}/active:
+    patch:
+      tags: [Users]
+      summary: Activate or deactivate a member
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [isActive]
+              properties:
+                isActive: { type: boolean }
+      responses:
+        '200': { description: Updated }
+
+  /users/{id}/login-code:
+    post:
+      tags: [Users]
+      summary: Generate an admin-assisted login code
+      description: |
+        Admin only. Last resort when a member cannot receive an OTP — the code
+        is returned in the response so an admin can read it out.
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '200':
+          description: Code generated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  code: { type: string, example: '123456' }
+                  phone: { type: string }
+                  fullName: { type: string }
+                  expiresAt: { type: string, format: date-time }
+        '400':
+          description: Dependent accounts have no phone to log in with.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  # ------------------------------------------------------------ Attendance
+  /attendance/current:
+    get:
+      tags: [Attendance]
+      summary: Which prayer is open for check-in
+      description: |
+        Returns the currently open window (if any) and the next one, so the
+        client can show a countdown. Returns 503 if prayer times cannot be
+        fetched from the upstream provider.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  date: { type: string, format: date }
+                  enforceWindow: { type: boolean }
+                  windowBeforeMinutes: { type: integer }
+                  windowAfterMinutes: { type: integer }
+                  current: { $ref: '#/components/schemas/PrayerWindow' }
+                  next: { $ref: '#/components/schemas/PrayerWindow' }
+        '503':
+          description: Prayer times temporarily unavailable.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /attendance/check-in:
+    post:
+      tags: [Attendance]
+      summary: Face-verified prayer check-in
+      description: |
+        The prayer is inferred server-side from the current window. The device
+        must be within the check-in geofence (default 150 m). A guardian may
+        check in a dependent by passing `forUserId`; the scanned face must then
+        match that dependent.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [descriptor, latitude, longitude]
+              properties:
+                descriptor: { $ref: '#/components/schemas/Descriptor' }
+                latitude: { type: number }
+                longitude: { type: number }
+                forUserId:
+                  type: string
+                  format: uuid
+                  description: A dependent of the caller. Omit to check in yourself.
+                prayer:
+                  type: string
+                  description: Only honoured when window enforcement is disabled.
+      responses:
+        '200':
+          description: Checked in
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  attendance: { $ref: '#/components/schemas/Attendance' }
+                  confidence: { type: number }
+        '401':
+          description: Face not recognized.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: Outside the geofence, or the face does not match the selected member.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '409':
+          description: No prayer window is open, or the member has no face enrolled.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /attendance/identify:
+    post:
+      tags: [Attendance]
+      summary: Identify a member by face (staff)
+      description: |
+        Requires the `identifyMembers` capability. Returns a *suggestion* only —
+        the client must confirm before anything is recorded.
+      x-capability: identifyMembers
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [descriptor, latitude, longitude]
+              properties:
+                descriptor: { $ref: '#/components/schemas/Descriptor' }
+                latitude: { type: number }
+                longitude: { type: number }
+      responses:
+        '200':
+          description: Best match (and runner-up)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  match:
+                    type: object
+                    properties:
+                      id: { type: string, format: uuid }
+                      fullName: { type: string }
+                      isDependent: { type: boolean }
+                      confidence: { type: number }
+                  runnerUp:
+                    type: object
+                    nullable: true
+                    properties:
+                      fullName: { type: string }
+                      confidence: { type: number }
+                  distanceFromSurau: { type: integer, description: Metres. }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /attendance/me:
+    get:
+      tags: [Attendance]
+      summary: My attendance history
+      parameters:
+        - name: limit
+          in: query
+          schema: { type: integer, default: 60 }
+      responses:
+        '200': { description: OK }
+
+  /attendance/me/today:
+    get:
+      tags: [Attendance]
+      summary: My prayers today
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  prayers:
+                    type: array
+                    items: { type: string }
+
+  /attendance/family/today:
+    get:
+      tags: [Attendance]
+      summary: Today's prayers for me and my dependents
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  date: { type: string, format: date }
+                  members:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: string, format: uuid }
+                        fullName: { type: string }
+                        isDependent: { type: boolean }
+                        hasFace: { type: boolean }
+                        prayers:
+                          type: array
+                          items: { type: string }
+
+  /attendance/family:
+    get:
+      tags: [Attendance]
+      summary: Attendance history for me and my dependents
+      parameters:
+        - name: limit
+          in: query
+          schema: { type: integer, default: 60 }
+      responses:
+        '200': { description: OK }
+
+  /attendance/manual:
+    post:
+      tags: [Attendance]
+      summary: Manual check-in (admin)
+      description: Admin only. Records attendance on a member's behalf, e.g. when face verification failed.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [userId, prayer, date]
+              properties:
+                userId: { type: string, format: uuid }
+                prayer: { type: string, enum: [subuh, zuhur, asar, maghrib, isyak] }
+                date: { type: string, format: date }
+      responses:
+        '200': { description: Recorded }
+
+  /attendance/date/{date}:
+    get:
+      tags: [Attendance]
+      summary: Attendance for a date (admin)
+      parameters:
+        - name: date
+          in: path
+          required: true
+          schema: { type: string, format: date }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  attendance:
+                    type: array
+                    items: { $ref: '#/components/schemas/Attendance' }
+
+  # -------------------------------------------------------------- Activity
+  /activity/merits/me:
+    get:
+      tags: [Activity]
+      summary: My merits
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  total: { type: integer }
+                  merits:
+                    type: array
+                    items: { $ref: '#/components/schemas/Merit' }
+
+  /activity/merits:
+    get:
+      tags: [Activity]
+      summary: All merits (staff)
+      x-capability: manageMerits
+      responses:
+        '200': { description: OK }
+    post:
+      tags: [Activity]
+      summary: Award merits
+      description: |
+        Requires `manageMerits`. Must be within the geofence, and the supplied
+        face descriptor must match the member being awarded.
+      x-capability: manageMerits
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [userId, points, descriptor, latitude, longitude]
+              properties:
+                userId: { type: string, format: uuid }
+                points: { type: integer, minimum: 1, maximum: 100 }
+                reason: { type: string, nullable: true }
+                descriptor: { $ref: '#/components/schemas/Descriptor' }
+                latitude: { type: number }
+                longitude: { type: number }
+      responses:
+        '201': { description: Awarded }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /activity/merits/{id}:
+    delete:
+      tags: [Activity]
+      summary: Revoke a merit
+      x-capability: manageMerits
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '200': { description: Revoked }
+
+  /activity/quran/me:
+    get:
+      tags: [Activity]
+      summary: My Quran logs
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  recitation: { type: integer }
+                  memorization: { type: integer }
+                  logs:
+                    type: array
+                    items: { $ref: '#/components/schemas/QuranLog' }
+
+  /activity/quran:
+    get:
+      tags: [Activity]
+      summary: All Quran logs (staff)
+      x-capability: manageQuran
+      responses:
+        '200': { description: OK }
+    post:
+      tags: [Activity]
+      summary: Log Quran activity
+      description: |
+        Every log must be recorded at the surau (geofence). At most one log per
+        member per cooldown window (default 60 minutes) — a 429 is returned with
+        `retryAfterMinutes`. Teachers/admins may log for any member (a matching
+        face descriptor is then required); members may log for themselves or a
+        dependent.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [kind, latitude, longitude]
+              properties:
+                kind: { type: string, enum: [recitation, memorization] }
+                surah: { type: string, nullable: true }
+                juz: { type: integer, minimum: 1, maximum: 30, nullable: true }
+                pages: { type: integer, minimum: 1, nullable: true }
+                note: { type: string, nullable: true }
+                forUserId: { type: string, format: uuid, nullable: true }
+                descriptor: { $ref: '#/components/schemas/Descriptor' }
+                latitude: { type: number }
+                longitude: { type: number }
+      responses:
+        '201': { description: Logged }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '429':
+          description: 'Cooldown active (code: QURAN_COOLDOWN).'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /activity/quran/{id}:
+    delete:
+      tags: [Activity]
+      summary: Delete a Quran log
+      description: Own, a dependent's, or any member for teachers/admins.
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '200': { description: Deleted }
+
+  # ------------------------------------------------------------- Dashboard
+  /dashboard/stats:
+    get:
+      tags: [Dashboard]
+      summary: Overall stats
+      description: Public — the dashboard is the app's landing page.
+      security: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  activeMembers: { type: integer }
+                  totalCheckIns: { type: integer }
+                  totalMerits: { type: integer }
+                  todayByPrayer:
+                    type: object
+                    additionalProperties: { type: integer }
+                  quran:
+                    type: object
+                    properties:
+                      recitation: { type: integer }
+                      memorization: { type: integer }
+
+  /dashboard/weekly:
+    get:
+      tags: [Dashboard]
+      summary: Weekly activity (last 7 days)
+      description: Public. Zero-filled per day.
+      security: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  days:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        date: { type: string, format: date }
+                        attendance: { type: integer }
+                        prayers:
+                          type: object
+                          additionalProperties: { type: integer }
+                        recitation: { type: integer }
+                        memorization: { type: integer }
+                        merits: { type: integer }
+
+  /dashboard/leaderboard:
+    get:
+      tags: [Dashboard]
+      summary: Leaderboard
+      description: Public.
+      security: []
+      parameters:
+        - name: period
+          in: query
+          schema: { type: string, enum: [month, year, all], default: all }
+        - name: category
+          in: query
+          schema:
+            type: string
+            enum: [overall, attendance, recitation, memorization, merits]
+            default: overall
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  leaderboard:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: string, format: uuid }
+                        full_name: { type: string }
+                        rank: { type: integer }
+                        overall: { type: integer }
+                        attendance: { type: integer }
+                        recitation: { type: integer }
+                        memorization: { type: integer }
+                        merits: { type: integer }
+
+  /dashboard/me/breakdown:
+    get:
+      tags: [Dashboard]
+      summary: My per-prayer counts
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  breakdown:
+                    type: object
+                    additionalProperties: { type: integer }
+
+  # -------------------------------------------------------------- Programs
+  /programs:
+    get:
+      tags: [Programs]
+      summary: List programs
+      parameters:
+        - name: includePast
+          in: query
+          schema: { type: boolean, default: false }
+      responses:
+        '200': { description: OK }
+    post:
+      tags: [Programs]
+      summary: Create a program (admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ProgramInput' }
+      responses:
+        '201': { description: Created }
+
+  /programs/{id}:
+    put:
+      tags: [Programs]
+      summary: Update a program (admin)
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ProgramInput' }
+      responses:
+        '200': { description: Updated }
+    delete:
+      tags: [Programs]
+      summary: Delete a program (admin)
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '200': { description: Deleted }
+
+  /programs/{id}/join:
+    post:
+      tags: [Programs]
+      summary: Join a program
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '200': { description: Joined }
+    delete:
+      tags: [Programs]
+      summary: Leave a program
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '200': { description: Left }
+
+  # -------------------------------------------------------------- Telegram
+  /telegram/link-token:
+    post:
+      tags: [Telegram]
+      summary: Create a Telegram link token
+      description: Returns a token to open the bot with, linking the chat to this account.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token: { type: string }
+                  url: { type: string }
+
+  /telegram/link:
+    delete:
+      tags: [Telegram]
+      summary: Unlink Telegram
+      responses:
+        '200': { description: Unlinked }
+
+  /telegram/status:
+    get:
+      tags: [Telegram]
+      summary: Telegram integration status (admin)
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  configured: { type: boolean }
+                  botUsername: { type: string, nullable: true }
+                  linkedUsers: { type: integer }
+
+  # ---------------------------------------------------------------- System
+  /health:
+    get:
+      tags: [System]
+      summary: Health check
+      description: Public. Verifies database connectivity.
+      security: []
+      responses:
+        '200':
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, example: ok }
+                  time: { type: string, format: date-time }
+        '503':
+          description: Database unreachable.

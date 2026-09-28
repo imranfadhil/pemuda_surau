@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { api } from '../lib/api.js';
 import { useAuth } from '../lib/auth.jsx';
 import DataTable from '../components/DataTable.jsx';
@@ -266,6 +267,12 @@ export default function AdminPage() {
           ? 'Manage members and attendance.'
           : `Signed in as ${ROLE_LABELS[user?.role] || 'staff'}.`}
       </p>
+
+      {isAdmin && (
+        <p className="muted" style={{ marginTop: -8 }}>
+          <Link to="/api-docs">📘 API reference</Link>
+        </p>
+      )}
 
       {error && <div className="alert alert-error">{error}</div>}
       {notice && <div className="alert alert-success">{notice}</div>}

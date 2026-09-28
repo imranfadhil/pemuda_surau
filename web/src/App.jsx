@@ -14,6 +14,7 @@ import DependentPage from './pages/DependentPage.jsx';
 import AdminPage from './pages/AdminPage.jsx';
 import QuranPage from './pages/QuranPage.jsx';
 import MeritsPage from './pages/MeritsPage.jsx';
+import ApiDocsPage from './pages/ApiDocsPage.jsx';
 
 function BottomNav() {
   const { user } = useAuth();
@@ -187,6 +188,16 @@ export default function App() {
                       <Protected>
                         <AdminOnly>
                           <AdminPage />
+                        </AdminOnly>
+                      </Protected>
+                    }
+                  />
+                  <Route
+                    path="/api-docs"
+                    element={
+                      <Protected>
+                        <AdminOnly>
+                          <ApiDocsPage />
                         </AdminOnly>
                       </Protected>
                     }

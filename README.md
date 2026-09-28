@@ -375,31 +375,56 @@ docker compose up -d --build
 
 ## API overview
 
+> **Full reference:** an OpenAPI 3.0 spec lives at `web/public/openapi.yaml` and is rendered
+> as an interactive Swagger UI page at **`/api-docs`** (admin-only — log in as an admin, then
+> open it from the Admin page). That spec is the source of truth; the table below is a
+> quick orientation only.
+
+Auth column: **–** = public, **user** = any logged-in member, **cap** = requires a capability
+(admins implicitly hold all of them).
+
 | Method | Path | Auth | Description |
 | --- | --- | --- | --- |
-| POST | `/api/auth/request-otp` | – | Send OTP to a phone |
-| POST | `/api/auth/verify-otp` | – | Verify OTP, returns JWT |
+| GET | `/api/health` | – | Health check (verifies DB connectivity) |
 | GET | `/api/auth/login-options` | – | Available login channels (Telegram-first) |
+| POST | `/api/auth/request-otp` | – | Send OTP to a phone (rate limited) |
+| POST | `/api/auth/verify-otp` | – | Verify OTP, returns JWT (new accounts must be near the surau) |
 | GET | `/api/auth/me` | user | Current profile |
 | PUT | `/api/users/me` | user | Update profile |
 | POST | `/api/users/me/face` | user | Enroll face descriptor |
-| GET | `/api/users` | admin | List members |
+| GET/POST | `/api/users/me/dependents` | user | List / add dependents (children) |
+| PUT/DELETE | `/api/users/me/dependents/:id` | user | Update / remove a dependent |
+| POST | `/api/users/me/dependents/:id/face` | user | Enroll a dependent's face |
+| POST | `/api/users/me/dependents/:id/phone` | user | Give a dependent their own login |
+| GET | `/api/users` | cap `viewMembers` | List members |
+| PATCH | `/api/users/:id/role` | admin | Change a member's role |
 | PATCH | `/api/users/:id/active` | admin | Activate/deactivate |
-| POST | `/api/users/:id/login-code` | admin | Generate an admin-assisted login code |
-| POST | `/api/telegram/link-token` | user | Create a Telegram link token |
-| DELETE | `/api/telegram/link` | user | Unlink Telegram |
-| GET | `/api/telegram/status` | admin | Telegram integration status |
-| POST | `/api/attendance/check-in` | user | Face-verified check-in |
+| POST | `/api/users/:id/login-code` | admin | Admin-assisted login code |
+| GET | `/api/attendance/current` | user | Which prayer is open now (+ next) |
+| POST | `/api/attendance/check-in` | user | Face-verified, geofenced check-in |
+| POST | `/api/attendance/identify` | cap `identifyMembers` | Identify a member by face (suggestion only) |
 | GET | `/api/attendance/me` | user | My history |
 | GET | `/api/attendance/me/today` | user | Today's prayers |
+| GET | `/api/attendance/family/today` | user | Today for me + dependents |
+| GET | `/api/attendance/family` | user | History for me + dependents |
 | POST | `/api/attendance/manual` | admin | Manual check-in |
 | GET | `/api/attendance/date/:date` | admin | Attendance for a date |
-| GET | `/api/dashboard/stats` | user | Overall stats |
-| GET | `/api/dashboard/leaderboard` | user | Rankings (`?days=7`) |
+| GET | `/api/activity/merits/me` | user | My merits |
+| GET/POST | `/api/activity/merits` | cap `manageMerits` | List / award merits |
+| DELETE | `/api/activity/merits/:id` | cap `manageMerits` | Revoke a merit |
+| GET | `/api/activity/quran/me` | user | My Quran logs |
+| GET/POST | `/api/activity/quran` | cap `manageQuran` (list) / user (log) | List / log Quran activity |
+| DELETE | `/api/activity/quran/:id` | user | Delete a Quran log |
+| GET | `/api/dashboard/stats` | – | Overall stats |
+| GET | `/api/dashboard/weekly` | – | Weekly activity (last 7 days) |
+| GET | `/api/dashboard/leaderboard` | – | Rankings (`?period=month\|year\|all&category=…`) |
 | GET | `/api/dashboard/me/breakdown` | user | My per-prayer counts |
 | GET | `/api/programs` | user | List programs |
 | POST/PUT/DELETE | `/api/programs[/:id]` | admin | Manage programs |
 | POST/DELETE | `/api/programs/:id/join` | user | Join/leave |
+| POST | `/api/telegram/link-token` | user | Create a Telegram link token |
+| DELETE | `/api/telegram/link` | user | Unlink Telegram |
+| GET | `/api/telegram/status` | admin | Telegram integration status |
 
 ## Privacy notes
 

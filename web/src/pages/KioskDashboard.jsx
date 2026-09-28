@@ -106,11 +106,22 @@ function MobileDashboard({ stats, weeklyChart, monthly, yearly, category, catInd
     <div className="mobile-dashboard">
       <header className="mobile-dash-head">
         <img className="brand-logo" src="/logo.png" alt="" />
-        <div>
+        <div className="mobile-dash-headtext">
           <div className="mobile-dash-title">Pemuda {SURAU.name}</div>
           <div className="mobile-dash-sub">{dateStr}</div>
         </div>
       </header>
+
+      {/* Primary call to action, above the fold. */}
+      <div className="mobile-cta">
+        <div className="mobile-cta-text">
+          <strong>Log in to check in for prayers</strong>
+          <span>Track your prayers, Quran and merits — and climb the leaderboard.</span>
+        </div>
+        <Link className="btn mobile-cta-btn" to="/login">
+          Log in
+        </Link>
+      </div>
 
       <div className="stat-grid">
         <div className="stat">
@@ -186,9 +197,16 @@ function MobileDashboard({ stats, weeklyChart, monthly, yearly, category, catInd
         </div>
       </div>
 
-      <p className="center muted" style={{ marginTop: 16 }}>
-        <Link to="/login">Log in</Link> to check in and track your own progress.
-      </p>
+      {/* Repeated at the end, for anyone who scrolled all the way down. */}
+      <div className="card mobile-cta-card">
+        <h2 className="card-title">Ready to join in?</h2>
+        <p className="muted" style={{ margin: '6px 0 14px' }}>
+          Log in to check in for prayers and track your own progress.
+        </p>
+        <Link className="btn btn-block" style={{ display: 'block', textAlign: 'center' }} to="/login">
+          Log in
+        </Link>
+      </div>
 
       <div className="card" style={{ textAlign: 'center' }}>
         <h2 className="card-title">💬 {COMMUNITY.name}</h2>
