@@ -76,6 +76,12 @@ router.post(
  * Dependents (children) managed by the current user.
  * A dependent has no phone of their own and cannot log in; the guardian
  * enrolls their face and checks them in.
+ *
+ * NOTE: these routes deliberately use `requireAuth` ONLY — never
+ * `requireCapability('manageDependents')`. Every member (including a freshly
+ * registered `youth`) must be able to add their own children without an admin
+ * promoting them to `parent` first. Safety comes from the `guardian_id = $X`
+ * scoping below, which means a caller can only ever touch their OWN dependents.
  */
 router.get(
   '/me/dependents',

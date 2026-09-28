@@ -51,7 +51,8 @@ export const ROLE_CAPABILITIES = {
   parent: ['manageDependents', 'checkIn'],
   teacher: ['manageQuran', 'manageMerits', 'viewMembers', 'identifyMembers', 'checkIn'],
   ajk: ['manageMerits', 'viewMembers', 'identifyMembers', 'checkIn'],
-  youth: ['checkIn'],
+  // Every member may manage their OWN dependents (children) — see roles.js.
+  youth: ['manageDependents', 'checkIn'],
 };
 
 /** True when the user (or role) holds a capability. */

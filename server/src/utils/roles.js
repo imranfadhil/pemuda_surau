@@ -38,7 +38,11 @@ export const CAPABILITIES = {
   parent: ['manageDependents', 'checkIn'],
   teacher: ['manageQuran', 'manageMerits', 'viewMembers', 'identifyMembers', 'checkIn'],
   ajk: ['manageMerits', 'viewMembers', 'identifyMembers', 'checkIn'],
-  youth: ['checkIn'],
+  // Every member may manage their OWN dependents (children). The dependents
+  // routes are scoped to the caller, so this is not a privilege escalation —
+  // it just means a newly registered member can add their children without an
+  // admin having to promote them to `parent` first.
+  youth: ['manageDependents', 'checkIn'],
 };
 
 export function capabilitiesFor(role) {
