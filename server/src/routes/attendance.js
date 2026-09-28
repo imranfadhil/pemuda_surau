@@ -78,7 +78,20 @@ router.get(
   '/current',
   requireAuth,
   asyncHandler(async (req, res) => {
-    const { current, next, date } = await getCurrentWindow();
+    let win;
+    try {
+      win = await getCurrentWindow();
+    } catch (err) {
+      // Prayer times come from an external API. When it is unreachable we
+      // return 503 with a clear reason instead of an opaque 500, and the client
+      // shows a retry prompt rather than "Loading…" forever.
+      console.error('[attendance/current] prayer times unavailable:', err.message);
+      throw httpError(
+        503,
+        'Prayer times are temporarily unavailable. Please try again in a moment.',
+      );
+    }
+    const { current, next, date } = win;
     res.json({
       date,
       enforceWindow: config.prayer.enforceWindow,

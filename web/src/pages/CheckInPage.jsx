@@ -37,6 +37,7 @@ export default function CheckInPage() {
   const [members, setMembers] = useState([]);
   const [selectedId, setSelectedId] = useState(null);
   const [win, setWin] = useState(null);
+  const [winError, setWinError] = useState('');
   const [now, setNow] = useState(Date.now());
 
   // Live framing/lighting feedback while the camera is open (paused during capture).
@@ -45,8 +46,11 @@ export default function CheckInPage() {
   function loadWindow() {
     api
       .currentWindow()
-      .then(setWin)
-      .catch(() => {});
+      .then((data) => {
+        setWin(data);
+        setWinError('');
+      })
+      .catch((err) => setWinError(err.message || 'Could not load prayer times.'));
   }
 
   function loadFamily() {
@@ -168,7 +172,18 @@ export default function CheckInPage() {
 
       <div className="card">
         <h2 className="card-title">Current window</h2>
-        {!win ? (
+        {!win && winError ? (
+          <div className="alert alert-error" style={{ marginTop: 12 }}>
+            {winError}
+            <button
+              className="btn btn-sm btn-secondary"
+              style={{ display: 'block', marginTop: 10 }}
+              onClick={loadWindow}
+            >
+              Try again
+            </button>
+          </div>
+        ) : !win ? (
           <p className="muted" style={{ marginTop: 12 }}>Loading prayer times…</p>
         ) : current ? (
           <>

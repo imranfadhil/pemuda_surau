@@ -1,3 +1,4 @@
+import './net.js'; // Must come first: configures outbound IPv4/IPv6 behaviour.
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
