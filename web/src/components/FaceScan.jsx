@@ -3,7 +3,7 @@ import { api } from '../lib/api.js';
 import {
   startCamera, stopCamera, captureDescriptor, loadModels, qualityMessage,
 } from '../lib/face.js';
-import { getPosition } from '../lib/geo.js';
+import { getPosition, formatDistance } from '../lib/geo.js';
 import { FaceTips, useFaceFeedback } from './FaceTips.jsx';
 
 /**
@@ -148,7 +148,7 @@ export default function FaceScan({ onConfirmed, onCancel }) {
               Confidence {(suggestion.match.confidence * 100).toFixed(1)}%
               {suggestion.match.isDependent ? ' · child account' : ''}
               {suggestion.distanceFromSurau != null
-                ? ` · ${suggestion.distanceFromSurau} m from surau`
+                ? ` · ${formatDistance(suggestion.distanceFromSurau)} from surau`
                 : ''}
             </div>
           </div>

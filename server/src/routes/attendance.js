@@ -5,7 +5,7 @@ import { config } from '../config.js';
 import { requireAuth, requireAdmin, requireCapability } from '../middleware/auth.js';
 import { asyncHandler, httpError } from '../middleware/errors.js';
 import { isValidDescriptor, findBestMatch } from '../utils/face.js';
-import { withinGeofence, isValidCoordinate } from '../utils/geo.js';
+import { withinGeofence, isValidCoordinate, formatDistance } from '../utils/geo.js';
 import { getCurrentWindow, getPrayerWindows, PRAYER_KEYS } from '../utils/prayerTimes.js';
 import { dateInTz } from '../utils/timezone.js';
 
@@ -54,7 +54,7 @@ function assertWithinGeofence(latitude, longitude) {
   if (!ok) {
     throw httpError(
       403,
-      `You must be at the surau to check in (you are about ${distance} m away).`,
+      `You must be at the surau to check in (you are about ${formatDistance(distance)} away).`,
     );
   }
   return distance;

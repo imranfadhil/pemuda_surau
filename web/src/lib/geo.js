@@ -1,4 +1,14 @@
 /**
+ * Human-friendly distance for display: metres below 1 km, kilometres above it
+ * (150 m, 1.5 km). Mirrors `formatDistance` in server/src/utils/geo.js.
+ */
+export function formatDistance(meters) {
+  const m = Number(meters);
+  if (!Number.isFinite(m)) return `${meters} m`;
+  return m < 1000 ? `${Math.round(m)} m` : `${(m / 1000).toFixed(1)} km`;
+}
+
+/**
  * Browser geolocation helper.
  *
  * Returns { latitude, longitude } or throws with a friendly message.

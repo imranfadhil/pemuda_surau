@@ -9,7 +9,7 @@ import { deliverOtp, canReachUser } from '../utils/otpDelivery.js';
 import { isTelegramConfigured, buildBotUrl } from '../utils/telegram.js';
 import { capabilitiesFor } from '../utils/roles.js';
 import { ageFromBirthDate, toDateString } from '../utils/age.js';
-import { isValidCoordinate, withinGeofence } from '../utils/geo.js';
+import { isValidCoordinate, withinGeofence, formatDistance } from '../utils/geo.js';
 
 const router = Router();
 
@@ -43,8 +43,8 @@ function assertWithinRegistrationArea(latitude, longitude) {
   if (!ok) {
     const err = httpError(
       403,
-      `Registration is only allowed near the surau. You are about ${distance} m away ` +
-        `(the limit is ${config.registration.radiusMeters} m).`,
+      `Registration is only allowed near the surau. You are about ${formatDistance(distance)} ` +
+        `away (the limit is ${formatDistance(config.registration.radiusMeters)}).`,
     );
     err.code = 'REGISTRATION_TOO_FAR';
     throw err;

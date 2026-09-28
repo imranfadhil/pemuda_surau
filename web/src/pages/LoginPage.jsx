@@ -5,7 +5,7 @@ import { useAuth } from '../lib/auth.jsx';
 import { getPosition } from '../lib/geo.js';
 import { SURAU } from '../lib/constants.js';
 
-const LOCATION_CODES = ['REGISTRATION_LOCATION_REQUIRED', 'REGISTRATION_TOO_FAR'];
+const LOCATION_REQUIRED = 'REGISTRATION_LOCATION_REQUIRED';
 
 export default function LoginPage() {
   const { login } = useAuth();
@@ -71,7 +71,10 @@ export default function LoginPage() {
       navigate(res.needsProfile ? '/register' : '/home', { replace: true });
     } catch (err) {
       setError(err.message);
-      setLocationRetry(LOCATION_CODES.includes(err.code));
+      // Only the missing-location case is fixed by granting permission. Telling
+      // a user who IS sharing location (but is simply too far away) to "allow
+      // location access" would send them chasing the wrong problem.
+      setLocationRetry(err.code === LOCATION_REQUIRED);
     } finally {
       setBusy(false);
     }

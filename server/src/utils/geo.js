@@ -36,6 +36,16 @@ export function isValidCoordinate(lat, lon) {
 }
 
 /**
+ * Human-friendly distance for user-facing messages: metres below 1 km,
+ * kilometres above it (150 m, 1.5 km).
+ */
+export function formatDistance(meters) {
+  const m = Number(meters);
+  if (!Number.isFinite(m)) return `${meters} m`;
+  return m < 1000 ? `${Math.round(m)} m` : `${(m / 1000).toFixed(1)} km`;
+}
+
+/**
  * Check whether a point is inside the surau's geofence.
  * Returns { ok, distance } where distance is metres from the surau.
  */

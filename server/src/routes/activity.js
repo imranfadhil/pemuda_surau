@@ -7,7 +7,7 @@ import { dateInTz } from '../utils/timezone.js';
 import { config } from '../config.js';
 import { roleHasCapability } from '../utils/roles.js';
 import { isValidDescriptor, findBestMatch } from '../utils/face.js';
-import { withinGeofence, isValidCoordinate } from '../utils/geo.js';
+import { withinGeofence, isValidCoordinate, formatDistance } from '../utils/geo.js';
 
 const router = Router();
 
@@ -60,7 +60,7 @@ function assertWithinGeofence(latitude, longitude) {
   if (!ok) {
     throw httpError(
       403,
-      `You must be at the surau to record activity (you are about ${distance} m away).`,
+      `You must be at the surau to record activity (you are about ${formatDistance(distance)} away).`,
     );
   }
   return distance;
