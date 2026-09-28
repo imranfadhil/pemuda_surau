@@ -5,6 +5,7 @@ import {
 import { api } from '../lib/api.js';
 import { useAuth } from '../lib/auth.jsx';
 import { PRAYERS, CATEGORIES, PERIODS, badgeFor } from '../lib/constants.js';
+import { duplicateNameKeys, disambiguatorFor } from '../lib/members.js';
 
 // Distinct, readable teals for the stacked prayer segments.
 const PRAYER_COLORS = {
@@ -39,6 +40,10 @@ export default function DashboardPage() {
   }, [period, category]);
 
   const activeCategory = CATEGORIES.find((c) => c.key === category) || CATEGORIES[0];
+
+  // Names are not unique, so tell same-named members apart by phone last-4 —
+  // but only when a collision actually exists in this list.
+  const duplicateNames = duplicateNameKeys(leaders);
 
   const todayChart = PRAYERS.map((p) => ({
     name: p.label,
@@ -191,11 +196,14 @@ export default function DashboardPage() {
               const isMe = row.id === user?.id;
               const score = row[category] ?? 0;
               const badge = badgeFor(score);
+              const disambig = disambiguatorFor(row, duplicateNames);
               return (
                 <div key={row.id} className="leader-row">
                   <div className={`rank-badge ${medal}`}>{row.rank}</div>
                   <div className="leader-name">
-                    {row.full_name} {isMe && <span className="pill">You</span>}
+                    {row.full_name}
+                    {disambig && <span className="muted"> · {disambig}</span>}{' '}
+                    {isMe && <span className="pill">You</span>}
                     {badge && (
                       <span className="badge" title={`${badge.label} tier`}>
                         {badge.icon} {badge.label}

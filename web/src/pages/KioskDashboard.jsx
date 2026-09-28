@@ -6,6 +6,7 @@ import {
 } from 'recharts';
 import { api } from '../lib/api.js';
 import { CATEGORIES, badgeFor, SURAU, COMMUNITY } from '../lib/constants.js';
+import { duplicateNameKeys, disambiguatorFor } from '../lib/members.js';
 import { useIsMobile } from '../lib/device.js';
 
 // How long each leaderboard category stays on screen before rotating.
@@ -24,7 +25,7 @@ function useClock() {
   return now;
 }
 
-function LeaderColumn({ title, rows, category }) {
+function LeaderColumn({ title, rows, category, duplicates }) {
   return (
     <div className="kiosk-leader-col">
       <div className="kiosk-leader-head">{title}</div>
@@ -35,11 +36,13 @@ function LeaderColumn({ title, rows, category }) {
           const medal = row.rank === 1 ? 'gold' : row.rank === 2 ? 'silver' : row.rank === 3 ? 'bronze' : '';
           const score = row[category.key] ?? 0;
           const badge = badgeFor(score);
+          const disambig = disambiguatorFor(row, duplicates);
           return (
             <div key={row.id} className="kiosk-leader-row">
               <div className={`rank-badge ${medal}`}>{row.rank}</div>
               <div className="kiosk-leader-name">
                 {row.full_name}
+                {disambig && <span className="kiosk-leader-disambig"> · {disambig}</span>}
                 {badge && <span className="badge">{badge.icon}</span>}
               </div>
               <div className="kiosk-leader-score">{score}</div>
@@ -97,7 +100,7 @@ function MobileNotice() {
  * wall display (no login QR, no rotation), but laid out as a normal scrolling
  * page so it works on a phone.
  */
-function MobileDashboard({ stats, weeklyChart, monthly, yearly, category, catIndex, onSelectCat }) {
+function MobileDashboard({ stats, weeklyChart, monthly, yearly, category, catIndex, onSelectCat, duplicates }) {
   const dateStr = new Date().toLocaleDateString(undefined, {
     weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
   });
@@ -161,8 +164,8 @@ function MobileDashboard({ stats, weeklyChart, monthly, yearly, category, catInd
           ))}
         </div>
         <div className="mobile-leader-grid">
-          <LeaderColumn title="This month" rows={monthly} category={category} />
-          <LeaderColumn title="This year" rows={yearly} category={category} />
+          <LeaderColumn title="This month" rows={monthly} category={category} duplicates={duplicates} />
+          <LeaderColumn title="This year" rows={yearly} category={category} duplicates={duplicates} />
         </div>
       </div>
 
@@ -248,6 +251,10 @@ export default function KioskDashboard({ publicHome = false }) {
   const [loginUrl, setLoginUrl] = useState('');
 
   const category = CATEGORIES[catIndex];
+
+  // Names are not unique, so tell same-named members apart by phone last-4 —
+  // but only when a collision actually exists in the displayed boards.
+  const duplicates = duplicateNameKeys([...monthly, ...yearly]);
 
   useEffect(() => {
     // Auto-generate the login link from the current URL so the QR always
@@ -338,6 +345,7 @@ export default function KioskDashboard({ publicHome = false }) {
         category={category}
         catIndex={catIndex}
         onSelectCat={setCatIndex}
+        duplicates={duplicates}
       />
     );
   }
@@ -375,8 +383,8 @@ export default function KioskDashboard({ publicHome = false }) {
               </div>
             </div>
             <div className="kiosk-leader-grid">
-              <LeaderColumn title="This month" rows={monthly} category={category} />
-              <LeaderColumn title="This year" rows={yearly} category={category} />
+              <LeaderColumn title="This month" rows={monthly} category={category} duplicates={duplicates} />
+              <LeaderColumn title="This year" rows={yearly} category={category} duplicates={duplicates} />
             </div>
           </div>
 

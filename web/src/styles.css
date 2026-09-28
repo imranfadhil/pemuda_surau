@@ -404,6 +404,68 @@ textarea:focus {
   text-align: center;
 }
 
+/* ---- Address autocomplete ---- */
+.address-autocomplete {
+  position: relative;
+}
+
+.address-row {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+
+.address-row input {
+  flex: 1;
+  min-width: 0;
+}
+
+.address-locate {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.address-note {
+  font-size: 0.78rem;
+  margin-top: 6px;
+}
+
+.address-suggestions {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  max-height: 260px;
+  overflow-y: auto;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  background: white;
+  border: 1px solid var(--slate-200);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+}
+
+.address-option {
+  padding: 9px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  line-height: 1.35;
+}
+
+.address-option.active {
+  background: var(--teal-50);
+}
+
+.address-empty {
+  padding: 12px 10px;
+  font-size: 0.82rem;
+  color: var(--slate-600);
+  text-align: center;
+}
+
 /* ---- Alerts ---- */
 .alert {
   padding: 12px 14px;
@@ -878,6 +940,17 @@ textarea:focus {
   justify-content: flex-end;
 }
 
+/* Long free-text cells (e.g. address) stay on one line and ellipsise; the full
+   value is available via the title attribute on hover. */
+.datatable .cell-truncate {
+  display: inline-block;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
+}
+
 .auth-wrap {
   min-height: 100vh;
   display: grid;
@@ -1066,6 +1139,13 @@ textarea:focus {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* Phone last-4 shown only when two members share a name. */
+.kiosk-leader-disambig {
+  font-weight: 400;
+  font-size: 0.85rem;
+  opacity: 0.75;
 }
 
 .kiosk-leader-score {

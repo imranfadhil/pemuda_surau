@@ -4,6 +4,7 @@ import { api } from '../lib/api.js';
 import { useAuth } from '../lib/auth.jsx';
 import DataTable from '../components/DataTable.jsx';
 import MemberPicker from '../components/MemberPicker.jsx';
+import { duplicateNameKeys, nameKey } from '../lib/members.js';
 import {
   PRAYERS, PRAYER_LABELS, todayISO, formatDate, formatDateTime, ROLES, ROLE_LABELS, can,
 } from '../lib/constants.js';
@@ -94,6 +95,10 @@ export default function AdminPage() {
     }
   }
 
+  // Members sharing a name — flagged so AJK can review them (names are not
+  // unique by design, but duplicates are worth a human look).
+  const duplicateNames = useMemo(() => duplicateNameKeys(users), [users]);
+
   // Member table columns. Kept in a memo because DataTable uses it as a
   // dependency for filtering/sorting.
   const memberColumns = useMemo(
@@ -105,6 +110,11 @@ export default function AdminPage() {
         render: (u) => (
           <div className="leader-name">
             {u.fullName}
+            {duplicateNames.has(nameKey(u.fullName)) && (
+              <span className="pill warn" title="Another member has the same name">
+                duplicate name
+              </span>
+            )}
             {u.guardianName ? (
               <div className="muted" style={{ fontWeight: 400 }}>
                 child of {u.guardianName}
@@ -118,6 +128,38 @@ export default function AdminPage() {
         label: 'Phone',
         sortable: true,
         render: (u) => u.phone || <span className="muted">no phone</span>,
+      },
+      {
+        key: 'gender',
+        label: 'Gender',
+        sortable: true,
+        render: (u) =>
+          u.gender ? (
+            u.gender === 'male' ? 'Male' : 'Female'
+          ) : (
+            <span className="muted">—</span>
+          ),
+      },
+      {
+        key: 'age',
+        label: 'Age',
+        sortable: true,
+        // Age is derived from birthDate server-side; nulls sort last.
+        render: (u) =>
+          u.age != null ? u.age : <span className="muted">—</span>,
+      },
+      {
+        key: 'address',
+        label: 'Address',
+        sortable: true,
+        render: (u) =>
+          u.address ? (
+            <span className="cell-truncate" title={u.address}>
+              {u.address}
+            </span>
+          ) : (
+            <span className="muted">—</span>
+          ),
       },
       {
         key: 'role',
@@ -206,7 +248,7 @@ export default function AdminPage() {
       },
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [codeBusy],
+    [codeBusy, duplicateNames],
   );
 
   // Daily attendance table columns.

@@ -12,15 +12,17 @@ const router = Router();
 
 const profileSchema = z.object({
   fullName: z.string().min(2).max(120),
-  birthDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable(),
-  gender: z.enum(['male', 'female']).optional().nullable(),
-  address: z.string().max(300).optional().nullable(),
+  // Required: the surau needs each member's date of birth (age is derived) and
+  // gender, plus a contact address.
+  birthDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  gender: z.enum(['male', 'female']),
+  address: z.string().trim().min(5).max(300),
 });
 
 const dependentSchema = z.object({
   fullName: z.string().min(2).max(120),
-  birthDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable(),
-  gender: z.enum(['male', 'female']).optional().nullable(),
+  birthDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  gender: z.enum(['male', 'female']),
 });
 
 // Give an existing dependent their own phone number so they can log in and

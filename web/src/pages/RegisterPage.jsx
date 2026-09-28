@@ -6,6 +6,7 @@ import {
   startCamera, stopCamera, captureEnrollmentDescriptor, loadModels,
 } from '../lib/face.js';
 import { FaceTips, useFaceFeedback } from '../components/FaceTips.jsx';
+import AddressAutocomplete from '../components/AddressAutocomplete.jsx';
 
 export default function RegisterPage() {
   const { user, refreshUser } = useAuth();
@@ -42,7 +43,7 @@ export default function RegisterPage() {
         fullName: form.fullName,
         birthDate: form.birthDate || null,
         gender: form.gender || null,
-        address: form.address || null,
+        address: form.address,
       });
       await refreshUser();
       setFaceStatus('Profile saved. Now enroll your face.');
@@ -129,11 +130,18 @@ export default function RegisterPage() {
                 max={new Date().toISOString().slice(0, 10)}
                 value={form.birthDate}
                 onChange={(e) => update('birthDate', e.target.value)}
+                required
               />
             </div>
             <div className="field" style={{ flex: 1 }}>
               <label htmlFor="gender">Gender</label>
-              <select id="gender" value={form.gender} onChange={(e) => update('gender', e.target.value)}>
+              <select
+                id="gender"
+                value={form.gender}
+                onChange={(e) => update('gender', e.target.value)}
+                required
+              >
+                <option value="">Select…</option>
                 <option value="male">Male</option>
                 <option value="female">Female</option>
               </select>
@@ -141,10 +149,12 @@ export default function RegisterPage() {
           </div>
           <div className="field">
             <label htmlFor="address">Address</label>
-            <input
+            <AddressAutocomplete
               id="address"
               value={form.address}
-              onChange={(e) => update('address', e.target.value)}
+              onChange={(v) => update('address', v)}
+              required
+              placeholder="e.g. No 12, Jalan Cerdik, Taman Universiti"
             />
           </div>
           <button className="btn btn-block" disabled={busy}>

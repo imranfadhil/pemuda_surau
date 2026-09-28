@@ -224,6 +224,7 @@ export default function DependentPage() {
               max={new Date().toISOString().slice(0, 10)}
               value={form.birthDate}
               onChange={(e) => update('birthDate', e.target.value)}
+              required
             />
           </div>
           <div className="field" style={{ flex: 1 }}>
@@ -232,7 +233,9 @@ export default function DependentPage() {
               id="depGender"
               value={form.gender}
               onChange={(e) => update('gender', e.target.value)}
+              required
             >
+              <option value="">Select…</option>
               <option value="male">Male</option>
               <option value="female">Female</option>
             </select>

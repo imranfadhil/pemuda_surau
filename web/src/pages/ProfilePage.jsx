@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../lib/api.js';
 import { useAuth } from '../lib/auth.jsx';
+import AddressAutocomplete from '../components/AddressAutocomplete.jsx';
 import { PRAYER_LABELS, formatDate, SURAU, CATEGORIES, badgeFor, ROLE_LABELS } from '../lib/constants.js';
 import { ageLabel } from '../lib/age.js';
 
@@ -142,6 +143,122 @@ function TelegramCard() {
   );
 }
 
+/**
+ * Edit the member's own details. Address is editable here so existing members
+ * (who registered before it was required) can fill it in.
+ */
+function DetailsCard() {
+  const { user, refreshUser } = useAuth();
+  const [form, setForm] = useState({
+    fullName: user?.fullName || '',
+    birthDate: user?.birthDate || '',
+    gender: user?.gender || '',
+    address: user?.address || '',
+  });
+  const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  // Re-sync if the user object changes (e.g. after a refresh elsewhere).
+  useEffect(() => {
+    setForm({
+      fullName: user?.fullName || '',
+      birthDate: user?.birthDate || '',
+      gender: user?.gender || '',
+      address: user?.address || '',
+    });
+  }, [user?.id, user?.fullName, user?.birthDate, user?.gender, user?.address]);
+
+  function update(key, value) {
+    setForm((f) => ({ ...f, [key]: value }));
+  }
+
+  async function save(e) {
+    e.preventDefault();
+    setError('');
+    setNotice('');
+    setBusy(true);
+    try {
+      await api.updateProfile({
+        fullName: form.fullName,
+        birthDate: form.birthDate,
+        gender: form.gender,
+        address: form.address,
+      });
+      await refreshUser();
+      setNotice('Details saved.');
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <form className="card" onSubmit={save}>
+      <h2 className="card-title">My details</h2>
+      <p className="muted" style={{ marginBottom: 12 }}>
+        Keep these up to date — the surau uses them for records and contact.
+      </p>
+
+      {error && <div className="alert alert-error">{error}</div>}
+      {notice && <div className="alert alert-success">{notice}</div>}
+
+      <div className="field">
+        <label htmlFor="pFullName">Full name</label>
+        <input
+          id="pFullName"
+          value={form.fullName}
+          onChange={(e) => update('fullName', e.target.value)}
+          required
+        />
+      </div>
+
+      <div className="row">
+        <div className="field" style={{ flex: 1 }}>
+          <label htmlFor="pBirthDate">Date of birth</label>
+          <input
+            id="pBirthDate"
+            type="date"
+            max={new Date().toISOString().slice(0, 10)}
+            value={form.birthDate}
+            onChange={(e) => update('birthDate', e.target.value)}
+            required
+          />
+        </div>
+        <div className="field" style={{ flex: 1 }}>
+          <label htmlFor="pGender">Gender</label>
+          <select
+            id="pGender"
+            value={form.gender}
+            onChange={(e) => update('gender', e.target.value)}
+            required
+          >
+            <option value="">Select…</option>
+            <option value="male">Male</option>
+            <option value="female">Female</option>
+          </select>
+        </div>
+      </div>
+
+      <div className="field">
+        <label htmlFor="pAddress">Address</label>
+        <AddressAutocomplete
+          id="pAddress"
+          value={form.address}
+          onChange={(v) => update('address', v)}
+          required
+          placeholder="e.g. No 12, Jalan Cerdik, Taman Universiti"
+        />
+      </div>
+
+      <button className="btn btn-block" disabled={busy}>
+        {busy ? 'Saving…' : 'Save details'}
+      </button>
+    </form>
+  );
+}
+
 export default function ProfilePage() {
   const { user, logout } = useAuth();
   const [history, setHistory] = useState([]);
@@ -216,6 +333,8 @@ export default function ProfilePage() {
       </div>
 
       <TelegramCard />
+
+      <DetailsCard />
 
       <BadgesCard />
 

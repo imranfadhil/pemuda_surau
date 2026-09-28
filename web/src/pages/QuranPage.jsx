@@ -185,7 +185,9 @@ export default function QuranPage() {
                   .map((m) => ({
                     value: m.id,
                     label: m.fullName,
-                    sublabel: m.isDependent ? 'child' : '',
+                    // Phone tail disambiguates same-named members; dependents
+                    // have no phone, so mark them as children instead.
+                    sublabel: m.isDependent ? 'child' : m.phoneLast4 || '',
                     searchText: [m.phone, m.isDependent ? 'child' : ''].filter(Boolean).join(' '),
                   }))}
               />

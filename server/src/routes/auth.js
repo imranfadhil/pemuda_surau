@@ -207,9 +207,18 @@ export function publicUser(user) {
     telegramUsername: user.telegram_username || null,
     guardianId: user.guardian_id || null,
     isDependent: Boolean(user.guardian_id),
+    // Account enable/disable flag. Without this the admin Members table always
+    // rendered "Active" and the Activate/Deactivate button could only ever set
+    // the account to active (it sent !undefined === true).
+    isActive: Boolean(user.is_active),
     // A dependent given their own phone number can log in and check themselves
     // in; a phone-less dependent must be checked in by their guardian.
     canSelfCheckIn: Boolean(user.phone),
+    // Last 4 digits of the phone, used to tell members with the SAME NAME apart
+    // on the leaderboard and in staff pickers. Names are not unique (two people
+    // can genuinely share one), so we disambiguate at the point of display
+    // rather than constraining the name. Null for dependents (no phone).
+    phoneLast4: user.phone ? String(user.phone).slice(-4) : null,
     createdAt: user.created_at,
   };
 }

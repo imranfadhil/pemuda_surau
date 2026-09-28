@@ -198,6 +198,8 @@ router.get(
        )
        SELECT u.id, u.full_name, u.avatar_url, u.guardian_id,
               g.full_name AS guardian_name,
+              -- Last 4 digits, so same-named members are distinguishable.
+              CASE WHEN u.phone IS NOT NULL THEN RIGHT(u.phone, 4) END AS phone_last4,
               COALESCE(att.attendance, 0) AS attendance,
               COALESCE(att.days_attended, 0) AS days_attended,
               COALESCE(rec.recitation, 0) AS recitation,
