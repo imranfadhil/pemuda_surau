@@ -245,6 +245,18 @@ Dependents:
   their guardian), and the admin's member/attendance lists;
 - are removed together with their attendance records when deleted.
 
+### Sharing a child with a second parent
+
+Parents often bring the same child to the surau separately. A dependent can have a
+**second guardian** (co-guardian) so either parent can check the child in:
+
+1. On **Family**, tap **Share with parent** next to the child.
+2. Enter the other parent's phone number (they must already have an account).
+3. Both parents now see the child in their family view and can check them in.
+
+Tap **Stop sharing** to remove the second guardian. A child can have at most two
+guardians (the primary guardian plus one co-guardian).
+
 > **Note:** a dependent's face is matched against the selected member only, so a guardian
 > cannot accidentally check in as their child (or vice versa).
 
@@ -396,6 +408,7 @@ Auth column: **–** = public, **user** = any logged-in member, **cap** = requir
 | PUT/DELETE | `/api/users/me/dependents/:id` | user | Update / remove a dependent |
 | POST | `/api/users/me/dependents/:id/face` | user | Enroll a dependent's face |
 | POST | `/api/users/me/dependents/:id/phone` | user | Give a dependent their own login |
+| POST | `/api/users/me/dependents/:id/co-guardian` | user | Share a dependent with a second parent |
 | GET | `/api/users` | cap `viewMembers` | List members |
 | PATCH | `/api/users/:id/role` | admin | Change a member's role |
 | PATCH | `/api/users/:id/active` | admin | Activate/deactivate |

@@ -31,6 +31,11 @@ export default function DependentPage() {
   const [promotePhone, setPromotePhone] = useState('');
   const [promoteBusy, setPromoteBusy] = useState(false);
 
+  // "Share with another parent" flow: add a second guardian by phone.
+  const [sharing, setSharing] = useState(null);
+  const [sharePhone, setSharePhone] = useState('');
+  const [shareBusy, setShareBusy] = useState(false);
+
   // Live framing/lighting feedback while the camera is open (paused during capture).
   const feedback = useFaceFeedback(videoRef, cameraOn, { enabled: !faceBusy });
 
@@ -194,6 +199,52 @@ export default function DependentPage() {
     }
   }
 
+  function startShare(dep) {
+    setError('');
+    setNotice('');
+    setEnrolling(null);
+    setPromoting(null);
+    setSharing(dep);
+    setSharePhone('');
+  }
+
+  function cancelShare() {
+    setSharing(null);
+    setSharePhone('');
+  }
+
+  async function submitShare(e) {
+    e.preventDefault();
+    setError('');
+    setNotice('');
+    setShareBusy(true);
+    try {
+      await api.setCoGuardian(sharing.id, sharePhone);
+      setNotice(
+        `${sharing.fullName} can now also be checked in by the parent with ${sharePhone}.`,
+      );
+      cancelShare();
+      load();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setShareBusy(false);
+    }
+  }
+
+  async function removeShare(dep) {
+    if (!window.confirm(`Stop sharing ${dep.fullName} with the other parent?`)) return;
+    setError('');
+    setNotice('');
+    try {
+      await api.setCoGuardian(dep.id, null);
+      setNotice(`${dep.fullName} is no longer shared.`);
+      load();
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
   return (
     <div>
       <h1 className="page-title">Family</h1>
@@ -272,6 +323,11 @@ export default function DependentPage() {
                     {dep.gender ? ` · ${dep.gender}` : ''}
                     {dep.phone ? ` · 📱 ${dep.phone}` : ''}
                   </div>
+                  {dep.coGuardianId && (
+                    <div className="muted" style={{ fontWeight: 400 }}>
+                      👥 Shared with another parent
+                    </div>
+                  )}
                 </div>
                 <span className={`pill ${dep.hasFace ? '' : 'warn'}`}>
                   {dep.hasFace ? 'face ✓' : 'no face'}
@@ -282,6 +338,15 @@ export default function DependentPage() {
                 <button className="btn btn-sm btn-secondary" onClick={() => startPromote(dep)}>
                   {dep.phone ? 'Change phone' : 'Give own login'}
                 </button>
+                {dep.coGuardianId ? (
+                  <button className="btn btn-sm btn-secondary" onClick={() => removeShare(dep)}>
+                    Stop sharing
+                  </button>
+                ) : (
+                  <button className="btn btn-sm btn-secondary" onClick={() => startShare(dep)}>
+                    Share with parent
+                  </button>
+                )}
                 <button className="btn btn-sm btn-secondary" onClick={() => startEdit(dep)}>
                   Edit
                 </button>
@@ -319,6 +384,36 @@ export default function DependentPage() {
           </div>
           <button className="btn" disabled={promoteBusy}>
             {promoteBusy ? 'Saving…' : 'Give own login'}
+          </button>
+        </form>
+      )}
+
+      {sharing && (
+        <form className="card" onSubmit={submitShare}>
+          <div className="row-between" style={{ marginBottom: 12 }}>
+            <h2 className="card-title" style={{ margin: 0 }}>👥 Share {sharing.fullName} with another parent</h2>
+            <button type="button" className="btn btn-sm btn-secondary" onClick={cancelShare}>
+              Cancel
+            </button>
+          </div>
+          <p className="muted" style={{ marginTop: 0 }}>
+            If you and your spouse sometimes bring {sharing.fullName} to the surau separately,
+            add the other parent's phone number here. Both of you will then be able to check
+            {' '}{sharing.fullName} in. They must already have an account.
+          </p>
+          <div className="field">
+            <label htmlFor="sharePhone">Other parent's phone number</label>
+            <input
+              id="sharePhone"
+              inputMode="tel"
+              placeholder="e.g. 0123456789"
+              value={sharePhone}
+              onChange={(e) => setSharePhone(e.target.value)}
+              required
+            />
+          </div>
+          <button className="btn" disabled={shareBusy}>
+            {shareBusy ? 'Saving…' : 'Share with this parent'}
           </button>
         </form>
       )}

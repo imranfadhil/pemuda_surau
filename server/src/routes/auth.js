@@ -206,6 +206,9 @@ export function publicUser(user) {
     telegramLinked: Boolean(user.telegram_chat_id),
     telegramUsername: user.telegram_username || null,
     guardianId: user.guardian_id || null,
+    // Optional second guardian (e.g. the other parent). Either guardian may
+    // check the child in, so both are treated as full guardians.
+    coGuardianId: user.co_guardian_id || null,
     isDependent: Boolean(user.guardian_id),
     // Account enable/disable flag. Without this the admin Members table always
     // rendered "Active" and the Activate/Deactivate button could only ever set

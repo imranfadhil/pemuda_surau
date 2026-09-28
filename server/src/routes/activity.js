@@ -111,7 +111,8 @@ async function resolveQuranTarget(caller, forUserId) {
   if (!forUserId || forUserId === caller.sub) return caller.sub;
 
   const { rows: depRows } = await query(
-    `SELECT id FROM users WHERE id = $1 AND guardian_id = $2 AND is_active = TRUE`,
+    `SELECT id FROM users
+     WHERE id = $1 AND (guardian_id = $2 OR co_guardian_id = $2) AND is_active = TRUE`,
     [forUserId, caller.sub],
   );
   if (depRows[0]) return forUserId;
@@ -325,7 +326,7 @@ router.delete(
       `DELETE FROM quran_logs q
        USING users u
        WHERE q.id = $1 AND q.user_id = u.id
-         AND ($2 = TRUE OR u.id = $3 OR u.guardian_id = $3)`,
+         AND ($2 = TRUE OR u.id = $3 OR u.guardian_id = $3 OR u.co_guardian_id = $3)`,
       [req.params.id, canManage, req.user.sub],
     );
     if (!rowCount) throw httpError(404, 'Log not found');

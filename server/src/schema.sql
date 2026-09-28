@@ -185,3 +185,9 @@ CREATE INDEX IF NOT EXISTS idx_quran_logged_by ON quran_logs (logged_by) WHERE l
 -- Age is now derived from birth_date instead of being stored directly.
 ALTER TABLE users ADD COLUMN IF NOT EXISTS birth_date DATE;
 ALTER TABLE users DROP COLUMN IF EXISTS age;
+
+-- A dependent may have a SECOND guardian, so both parents can check the child
+-- in (they often arrive separately). The primary guardian is `guardian_id`;
+-- this is the optional co-guardian. Both are treated as full guardians.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS co_guardian_id UUID REFERENCES users(id) ON DELETE SET NULL;
+CREATE INDEX IF NOT EXISTS idx_users_co_guardian ON users (co_guardian_id) WHERE co_guardian_id IS NOT NULL;

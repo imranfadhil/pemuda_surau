@@ -499,6 +499,41 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
 
+  /users/me/dependents/{id}/co-guardian:
+    post:
+      tags: [Users]
+      summary: Share a dependent with a second guardian
+      description: |
+        Sets (or clears) a dependent's second guardian so both parents can check
+        the child in — they often arrive separately. The other parent must
+        already have an account; they are looked up by phone number. Only the
+        primary guardian (or an admin) may change this. Send `phone: null` to
+        clear the co-guardian.
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                phone:
+                  type: string
+                  nullable: true
+                  example: '0123456789'
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  dependent: { $ref: '#/components/schemas/User' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
   /users:
     get:
       tags: [Users]

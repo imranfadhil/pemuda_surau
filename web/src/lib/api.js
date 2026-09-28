@@ -58,6 +58,8 @@ export const api = {
     request(`/users/me/dependents/${id}/face`, { method: 'POST', body: { descriptor } }),
   setDependentPhone: (id, phone) =>
     request(`/users/me/dependents/${id}/phone`, { method: 'POST', body: { phone } }),
+  setCoGuardian: (id, phone) =>
+    request(`/users/me/dependents/${id}/co-guardian`, { method: 'POST', body: { phone } }),
   deleteDependent: (id) => request(`/users/me/dependents/${id}`, { method: 'DELETE' }),
   listUsers: () => request('/users'),
   setUserActive: (id, isActive) => request(`/users/${id}/active`, { method: 'PATCH', body: { isActive } }),

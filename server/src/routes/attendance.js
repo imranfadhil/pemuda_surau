@@ -202,15 +202,17 @@ router.post(
 
     if (!isValidDescriptor(descriptor)) throw httpError(400, 'Invalid face descriptor');
 
-    // The device must be at the surau.
-    assertWithinGeofence(latitude, longitude, accuracy);
+    // The device must be at the surau. Capture the distance for the response
+    // diagnostics below.
+    const distanceFromSurau = assertWithinGeofence(latitude, longitude, accuracy);
 
     // A guardian may check in on behalf of a dependent (child) they manage.
     // The verified face must belong to that dependent.
     let targetUserId = req.user.sub;
     if (forUserId && forUserId !== req.user.sub) {
       const { rows: depRows } = await query(
-        `SELECT id FROM users WHERE id = $1 AND guardian_id = $2 AND is_active = TRUE`,
+        `SELECT id FROM users
+         WHERE id = $1 AND (guardian_id = $2 OR co_guardian_id = $2) AND is_active = TRUE`,
         [forUserId, req.user.sub],
       );
       if (!depRows[0]) throw httpError(403, 'You can only check in for your own dependents.');
@@ -332,7 +334,7 @@ router.get(
               COALESCE(array_agg(a.prayer) FILTER (WHERE a.prayer IS NOT NULL), '{}') AS prayers
        FROM users u
        LEFT JOIN attendance a ON a.user_id = u.id AND a.attendance_date = $2
-       WHERE u.id = $1 OR u.guardian_id = $1
+       WHERE u.id = $1 OR u.guardian_id = $1 OR u.co_guardian_id = $1
        GROUP BY u.id
        ORDER BY (u.guardian_id IS NOT NULL), u.created_at ASC`,
       [req.user.sub, date],
@@ -360,7 +362,7 @@ router.get(
       `SELECT a.*, u.full_name, u.guardian_id
        FROM attendance a
        JOIN users u ON u.id = a.user_id
-       WHERE u.id = $1 OR u.guardian_id = $1
+       WHERE u.id = $1 OR u.guardian_id = $1 OR u.co_guardian_id = $1
        ORDER BY a.attendance_date DESC, a.checked_in_at DESC
        LIMIT $2`,
       [req.user.sub, limit],

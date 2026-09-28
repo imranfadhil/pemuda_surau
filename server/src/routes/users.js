@@ -82,7 +82,9 @@ router.get(
   requireAuth,
   asyncHandler(async (req, res) => {
     const { rows } = await query(
-      `SELECT * FROM users WHERE guardian_id = $1 ORDER BY created_at ASC`,
+      `SELECT * FROM users
+       WHERE guardian_id = $1 OR co_guardian_id = $1
+       ORDER BY created_at ASC`,
       [req.user.sub],
     );
     res.json({ dependents: rows.map(publicUser) });
@@ -127,7 +129,8 @@ router.post(
     const { rows: depRows } = await query(
       isAdmin
         ? `SELECT * FROM users WHERE id = $1 AND guardian_id IS NOT NULL`
-        : `SELECT * FROM users WHERE id = $1 AND guardian_id = $2`,
+        : `SELECT * FROM users
+           WHERE id = $1 AND (guardian_id = $2 OR co_guardian_id = $2)`,
       isAdmin ? [req.params.id] : [req.params.id, req.user.sub],
     );
     const dependent = depRows[0];
@@ -148,6 +151,66 @@ router.post(
   }),
 );
 
+/**
+ * Set (or clear) a dependent's SECOND guardian.
+ *
+ * Both parents often bring the same child to the surau separately, so either
+ * guardian must be able to check the child in. The primary guardian adds the
+ * other parent by phone number; that parent must already have an account.
+ *
+ * Body: { phone } to set, or { phone: null } to clear.
+ */
+router.post(
+  '/me/dependents/:id/co-guardian',
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const raw = req.body?.phone;
+    const isAdmin = req.user.role === 'admin';
+
+    // Only the primary guardian (or an admin) may change this.
+    const { rows: depRows } = await query(
+      isAdmin
+        ? `SELECT * FROM users WHERE id = $1 AND guardian_id IS NOT NULL`
+        : `SELECT * FROM users WHERE id = $1 AND guardian_id = $2`,
+      isAdmin ? [req.params.id] : [req.params.id, req.user.sub],
+    );
+    const dependent = depRows[0];
+    if (!dependent) throw httpError(404, 'Dependent not found');
+
+    // Clearing the co-guardian.
+    if (raw === null || raw === undefined || String(raw).trim() === '') {
+      const { rows } = await query(
+        `UPDATE users SET co_guardian_id = NULL, updated_at = now() WHERE id = $1 RETURNING *`,
+        [dependent.id],
+      );
+      return res.json({ dependent: publicUser(rows[0]) });
+    }
+
+    const phone = canonicalPhone(String(raw));
+    const { rows: guardianRows } = await query(
+      `SELECT id, full_name FROM users
+       WHERE phone = ANY($1::text[]) AND is_active = TRUE AND guardian_id IS NULL`,
+      [phoneVariants(phone)],
+    );
+    const coGuardian = guardianRows[0];
+    if (!coGuardian) {
+      throw httpError(
+        404,
+        'No active member found with that phone number. They need to register first.',
+      );
+    }
+    if (coGuardian.id === dependent.guardian_id) {
+      throw httpError(400, 'That is already the primary guardian.');
+    }
+
+    const { rows } = await query(
+      `UPDATE users SET co_guardian_id = $1, updated_at = now() WHERE id = $2 RETURNING *`,
+      [coGuardian.id, dependent.id],
+    );
+    res.json({ dependent: publicUser(rows[0]) });
+  }),
+);
+
 /** Update a dependent owned by the current user. */
 router.put(
   '/me/dependents/:id',
@@ -160,7 +223,7 @@ router.put(
     const { rows } = await query(
       `UPDATE users
        SET full_name = $1, birth_date = $2, gender = $3, updated_at = now()
-       WHERE id = $4 AND guardian_id = $5 RETURNING *`,
+       WHERE id = $4 AND (guardian_id = $5 OR co_guardian_id = $5) RETURNING *`,
       [fullName, birthDate ?? null, gender ?? null, req.params.id, req.user.sub],
     );
     if (!rows[0]) throw httpError(404, 'Dependent not found');
@@ -180,7 +243,7 @@ router.post(
     const { rows } = await query(
       `UPDATE users
        SET face_descriptor = $1, face_enrolled_at = now(), updated_at = now()
-       WHERE id = $2 AND guardian_id = $3 RETURNING *`,
+       WHERE id = $2 AND (guardian_id = $3 OR co_guardian_id = $3) RETURNING *`,
       [JSON.stringify(descriptor), req.params.id, req.user.sub],
     );
     if (!rows[0]) throw httpError(404, 'Dependent not found');
@@ -194,7 +257,7 @@ router.delete(
   requireAuth,
   asyncHandler(async (req, res) => {
     const { rowCount } = await query(
-      `DELETE FROM users WHERE id = $1 AND guardian_id = $2`,
+      `DELETE FROM users WHERE id = $1 AND (guardian_id = $2 OR co_guardian_id = $2)`,
       [req.params.id, req.user.sub],
     );
     if (!rowCount) throw httpError(404, 'Dependent not found');
@@ -209,13 +272,18 @@ router.get(
   requireCapability('viewMembers'),
   asyncHandler(async (req, res) => {
     const { rows } = await query(
-      `SELECT u.*, g.full_name AS guardian_name
+      `SELECT u.*, g.full_name AS guardian_name, cg.full_name AS co_guardian_name
        FROM users u
        LEFT JOIN users g ON g.id = u.guardian_id
+       LEFT JOIN users cg ON cg.id = u.co_guardian_id
        ORDER BY u.created_at DESC`,
     );
     res.json({
-      users: rows.map((row) => ({ ...publicUser(row), guardianName: row.guardian_name || null })),
+      users: rows.map((row) => ({
+        ...publicUser(row),
+        guardianName: row.guardian_name || null,
+        coGuardianName: row.co_guardian_name || null,
+      })),
     });
   }),
 );
