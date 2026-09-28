@@ -3,8 +3,9 @@ import { api } from '../lib/api.js';
 import { useAuth } from '../lib/auth.jsx';
 import FaceScan from '../components/FaceScan.jsx';
 import MemberPicker from '../components/MemberPicker.jsx';
+import QuranLogDetails from '../components/QuranLogDetails.jsx';
 import { getPosition } from '../lib/geo.js';
-import { formatDate, can } from '../lib/constants.js';
+import { can } from '../lib/constants.js';
 
 /**
  * Quran activity page.
@@ -267,21 +268,8 @@ export default function QuranPage() {
           <p className="muted">No activity logged yet.</p>
         ) : (
           mine.logs.slice(0, 10).map((log) => (
-            <div key={log.id} className="leader-row">
-              <div className="rank-badge" style={{ background: 'var(--teal-100)', color: 'var(--teal-900)' }}>
-                {log.kind === 'recitation' ? '📖' : '🧠'}
-              </div>
-              <div className="leader-name">
-                {log.kind === 'recitation' ? 'Recitation' : 'Memorization'}
-                <div className="muted" style={{ fontWeight: 400 }}>
-                  {[log.surah, log.juz ? `Juz ${log.juz}` : null, log.pages ? `${log.pages} pages` : null]
-                    .filter(Boolean)
-                    .join(' · ') || '—'}
-                  {' · '}
-                  {formatDate(log.logged_date)}
-                  {log.logged_by_name ? ` · recorded by ${log.logged_by_name}` : ''}
-                </div>
-              </div>
+            <div key={log.id} className="quran-log-row">
+              <QuranLogDetails log={log} />
               <button className="btn btn-sm btn-secondary" onClick={() => remove(log.id)}>
                 Delete
               </button>
@@ -290,6 +278,20 @@ export default function QuranPage() {
         )}
       </div>
 
+      {mine.family?.length > 0 && (
+        <div className="card">
+          <h2 className="card-title">👨‍👩‍👧 My children's activity</h2>
+          <p className="muted" style={{ marginBottom: 12 }}>
+            What your children recited or memorized, including notes from their teacher.
+          </p>
+          {mine.family.slice(0, 20).map((log) => (
+            <div key={log.id} className="quran-log-row">
+              <QuranLogDetails log={log} showMember />
+            </div>
+          ))}
+        </div>
+      )}
+
       {canManage && (
         <div className="card">
           <h2 className="card-title">Recent activity (all members)</h2>
@@ -297,22 +299,8 @@ export default function QuranPage() {
             <p className="muted">No Quran activity recorded yet.</p>
           ) : (
             recent.slice(0, 20).map((log) => (
-              <div key={log.id} className="leader-row">
-                <div className="rank-badge" style={{ background: 'var(--teal-100)', color: 'var(--teal-900)' }}>
-                  {log.kind === 'recitation' ? '📖' : '🧠'}
-                </div>
-                <div className="leader-name">
-                  {log.full_name}
-                  <div className="muted" style={{ fontWeight: 400 }}>
-                    {log.kind === 'recitation' ? 'Recitation' : 'Memorization'}
-                    {log.surah ? ` · ${log.surah}` : ''}
-                    {' · '}
-                    {formatDate(log.logged_date)}
-                    {log.logged_by_name
-                      ? ` · recorded by ${log.logged_by_name}`
-                      : ' · self-logged'}
-                  </div>
-                </div>
+              <div key={log.id} className="quran-log-row">
+                <QuranLogDetails log={log} showMember />
                 <button className="btn btn-sm btn-secondary" onClick={() => remove(log.id)}>
                   Delete
                 </button>

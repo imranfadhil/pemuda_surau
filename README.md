@@ -435,7 +435,7 @@ Auth column: **–** = public, **user** = any logged-in member, **cap** = requir
 | PATCH | `/api/users/:id/active` | admin | Activate/deactivate |
 | POST | `/api/users/:id/login-code` | admin | Admin-assisted login code |
 | GET | `/api/attendance/current` | user | Which prayer is open now (+ next) |
-| POST | `/api/attendance/check-in` | user | Face-verified, geofenced check-in |
+| POST | `/api/attendance/check-in` | user | Face-verified, geofenced check-in (self, dependent, or any member for staff) |
 | POST | `/api/attendance/identify` | cap `identifyMembers` | Identify a member by face (suggestion only) |
 | GET | `/api/attendance/me` | user | My history |
 | GET | `/api/attendance/me/today` | user | Today's prayers |

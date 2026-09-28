@@ -8,6 +8,7 @@ import { isValidDescriptor, findBestMatch } from '../utils/face.js';
 import { withinGeofence, isValidCoordinate, formatDistance } from '../utils/geo.js';
 import { getCurrentWindow, getPrayerWindows, PRAYER_KEYS } from '../utils/prayerTimes.js';
 import { dateInTz } from '../utils/timezone.js';
+import { roleHasCapability } from '../utils/roles.js';
 
 const router = Router();
 
@@ -207,15 +208,26 @@ router.post(
     const distanceFromSurau = assertWithinGeofence(latitude, longitude, accuracy);
 
     // A guardian may check in on behalf of a dependent (child) they manage.
-    // The verified face must belong to that dependent.
+    // Staff (teachers/AJK/admins) may check in ANY member — they scan a youth's
+    // face at the surau, so the verified face is the proof of identity.
     let targetUserId = req.user.sub;
     if (forUserId && forUserId !== req.user.sub) {
+      const isStaff = roleHasCapability(req.user.role, 'identifyMembers');
       const { rows: depRows } = await query(
-        `SELECT id FROM users
-         WHERE id = $1 AND (guardian_id = $2 OR co_guardian_id = $2) AND is_active = TRUE`,
-        [forUserId, req.user.sub],
+        isStaff
+          ? `SELECT id FROM users WHERE id = $1 AND is_active = TRUE`
+          : `SELECT id FROM users
+             WHERE id = $1 AND (guardian_id = $2 OR co_guardian_id = $2) AND is_active = TRUE`,
+        isStaff ? [forUserId] : [forUserId, req.user.sub],
       );
-      if (!depRows[0]) throw httpError(403, 'You can only check in for your own dependents.');
+      if (!depRows[0]) {
+        throw httpError(
+          403,
+          isStaff
+            ? 'Member not found.'
+            : 'You can only check in for your own dependents.',
+        );
+      }
       targetUserId = forUserId;
     }
 

@@ -7,7 +7,8 @@ import {
 } from '../lib/face.js';
 import { getAccuratePosition } from '../lib/geo.js';
 import { FaceTips, useFaceFeedback } from '../components/FaceTips.jsx';
-import { PRAYERS, PRAYER_LABELS } from '../lib/constants.js';
+import FaceScan from '../components/FaceScan.jsx';
+import { PRAYERS, PRAYER_LABELS, can } from '../lib/constants.js';
 
 function formatClock(iso) {
   if (!iso) return '';
@@ -28,6 +29,12 @@ export default function CheckInPage() {
   const { user } = useAuth();
   const videoRef = useRef(null);
   const streamRef = useRef(null);
+
+  // Staff (teachers/AJK/admins) can scan ANY member's face and check them in,
+  // which is how a whole class is recorded quickly at the surau.
+  const canIdentify = can(user, 'identifyMembers');
+  const [staffMode, setStaffMode] = useState(false);
+  const [staffBusy, setStaffBusy] = useState(false);
 
   const [cameraOn, setCameraOn] = useState(false);
   const [status, setStatus] = useState('');
@@ -101,8 +108,7 @@ export default function CheckInPage() {
     }
   }
 
-  async function verify() {
-    setError('');
+  async function verify() {    setError('');
     setResult(null);
     setBusy(true);
     setStatus('Verifying…');
@@ -150,10 +156,68 @@ export default function CheckInPage() {
     }
   }
 
+  /**
+   * Staff flow: a face scan already identified the member, so check them in
+   * directly. The scan's descriptor + location are reused as the proof, so the
+   * server re-verifies the face against the selected member.
+   */
+  async function staffCheckIn({ member, descriptor, latitude, longitude, accuracy }) {
+    setError('');
+    setResult(null);
+    setStaffBusy(true);
+    setStatus(`Checking in ${member.fullName}…`);
+    try {
+      const res = await api.checkIn({
+        descriptor,
+        latitude,
+        longitude,
+        accuracy,
+        forUserId: member.id,
+      });
+      setResult({ ...res, memberName: member.fullName });
+      setStatus('');
+      setStaffMode(false);
+      loadFamily();
+      loadWindow();
+    } catch (err) {
+      setError(err.message);
+      setStatus('');
+    } finally {
+      setStaffBusy(false);
+    }
+  }
+
   return (
     <div>
       <h1 className="page-title">Prayer check-in</h1>
       <p className="page-sub">Your prayer is detected automatically from the current time.</p>
+
+      {canIdentify && (
+        <div className="card">
+          <div className="row-between">
+            <h2 className="card-title" style={{ margin: 0 }}>👥 Staff check-in</h2>
+            <button
+              className="btn btn-sm btn-secondary"
+              onClick={() => {
+                setStaffMode((v) => !v);
+                setError('');
+                setResult(null);
+              }}
+            >
+              {staffMode ? 'Close' : 'Scan a member'}
+            </button>
+          </div>
+          <p className="muted" style={{ margin: '6px 0 0' }}>
+            Scan any member's face to check them in — no need to select them first.
+          </p>
+          {staffMode && (
+            <div style={{ marginTop: 12 }}>
+              {staffBusy && <div className="alert alert-info">{status}</div>}
+              <FaceScan onConfirmed={staffCheckIn} onCancel={() => setStaffMode(false)} />
+            </div>
+          )}
+        </div>
+      )}
 
       {members.length > 1 && (
         <div className="card">
@@ -233,8 +297,18 @@ export default function CheckInPage() {
         {status && <div className="alert alert-info">{status}</div>}
         {result && (
           <div className="alert alert-success">
-            Checked in for <strong>{PRAYER_LABELS[result.attendance.prayer]}</strong>! Confidence{' '}
-            {(result.confidence * 100).toFixed(1)}%
+            {result.memberName ? (
+              <>
+                Checked in <strong>{result.memberName}</strong> for{' '}
+                <strong>{PRAYER_LABELS[result.attendance.prayer]}</strong>! Confidence{' '}
+                {(result.confidence * 100).toFixed(1)}%
+              </>
+            ) : (
+              <>
+                Checked in for <strong>{PRAYER_LABELS[result.attendance.prayer]}</strong>!
+                Confidence {(result.confidence * 100).toFixed(1)}%
+              </>
+            )}
           </div>
         )}
 

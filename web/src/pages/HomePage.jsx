@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { api } from '../lib/api.js';
 import { useAuth } from '../lib/auth.jsx';
 import CommunityLink from '../components/CommunityLink.jsx';
+import QuranLogDetails from '../components/QuranLogDetails.jsx';
 import { PRAYERS, PRAYER_LABELS, SURAU } from '../lib/constants.js';
 
 function formatClock(iso) {
@@ -154,6 +155,22 @@ export default function HomePage() {
               <span className={`pill ${m.hasFace ? '' : 'warn'}`}>
                 {m.hasFace ? 'face ✓' : 'no face'}
               </span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {quran?.family?.length > 0 && (
+        <div className="card">
+          <div className="row-between" style={{ marginBottom: 12 }}>
+            <h2 className="card-title">📖 My children's Quran activity</h2>
+            <Link className="pill" to="/quran">
+              See all
+            </Link>
+          </div>
+          {quran.family.slice(0, 3).map((log) => (
+            <div key={log.id} className="quran-log-row">
+              <QuranLogDetails log={log} showMember />
             </div>
           ))}
         </div>

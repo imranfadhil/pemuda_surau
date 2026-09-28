@@ -659,9 +659,18 @@ paths:
       summary: Face-verified prayer check-in
       description: |
         The prayer is inferred server-side from the current window. The device
-        must be within the check-in geofence (default 150 m). A guardian may
-        check in a dependent by passing `forUserId`; the scanned face must then
-        match that dependent.
+        must be within the check-in geofence (default 150 m).
+
+        `forUserId` selects who is being checked in:
+
+        - **omitted** — check yourself in;
+        - **a dependent** — a guardian checks in their own child;
+        - **any member** — staff holding the `identifyMembers` capability
+          (teacher, AJK, admin) check in anyone, which is how a whole class is
+          recorded quickly at the surau.
+
+        In every case the scanned face must match the selected member, so a
+        mismatch is rejected.
       requestBody:
         required: true
         content:
@@ -676,7 +685,9 @@ paths:
                 forUserId:
                   type: string
                   format: uuid
-                  description: A dependent of the caller. Omit to check in yourself.
+                  description: |
+                    Who to check in. Omit for yourself; a dependent id for your
+                    own child; any member id when you hold `identifyMembers`.
                 prayer:
                   type: string
                   description: Only honoured when window enforcement is disabled.
