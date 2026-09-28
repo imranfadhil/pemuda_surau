@@ -5,7 +5,7 @@ import FaceScan from '../components/FaceScan.jsx';
 import MemberPicker from '../components/MemberPicker.jsx';
 import QuranLogDetails from '../components/QuranLogDetails.jsx';
 import { getPosition } from '../lib/geo.js';
-import { can } from '../lib/constants.js';
+import { can, formatDate } from '../lib/constants.js';
 
 /**
  * Quran activity page.
@@ -29,6 +29,12 @@ export default function QuranPage() {
   const [busy, setBusy] = useState(false);
   const [scanOpen, setScanOpen] = useState(false);
   const [proof, setProof] = useState(null);
+
+  // Editing an existing log (teachers/admins, or your own). Only the content is
+  // editable — the member and date are fixed.
+  const [editing, setEditing] = useState(null);
+  const [editForm, setEditForm] = useState({ kind: 'recitation', surah: '', juz: '', pages: '', note: '' });
+  const [editBusy, setEditBusy] = useState(false);
 
   const [form, setForm] = useState({
     userId: '',
@@ -107,6 +113,47 @@ export default function QuranPage() {
       loadRecent();
     } catch (err) {
       setError(err.message);
+    }
+  }
+
+  function startEdit(log) {
+    setError('');
+    setNotice('');
+    setEditing(log);
+    setEditForm({
+      kind: log.kind,
+      surah: log.surah || '',
+      juz: log.juz ?? '',
+      pages: log.pages ?? '',
+      note: log.note || '',
+    });
+  }
+
+  function cancelEdit() {
+    setEditing(null);
+  }
+
+  async function saveEdit(e) {
+    e.preventDefault();
+    setError('');
+    setNotice('');
+    setEditBusy(true);
+    try {
+      await api.updateQuran(editing.id, {
+        kind: editForm.kind,
+        surah: editForm.surah || null,
+        juz: editForm.juz ? Number(editForm.juz) : null,
+        pages: editForm.pages ? Number(editForm.pages) : null,
+        note: editForm.note || null,
+      });
+      setNotice('Quran activity updated.');
+      setEditing(null);
+      loadMine();
+      loadRecent();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setEditBusy(false);
     }
   }
 
@@ -270,9 +317,14 @@ export default function QuranPage() {
           mine.logs.slice(0, 10).map((log) => (
             <div key={log.id} className="quran-log-row">
               <QuranLogDetails log={log} />
-              <button className="btn btn-sm btn-secondary" onClick={() => remove(log.id)}>
-                Delete
-              </button>
+              <div className="row-btns">
+                <button className="btn btn-sm btn-secondary" onClick={() => startEdit(log)}>
+                  Edit
+                </button>
+                <button className="btn btn-sm btn-secondary" onClick={() => remove(log.id)}>
+                  Delete
+                </button>
+              </div>
             </div>
           ))
         )}
@@ -301,13 +353,91 @@ export default function QuranPage() {
             recent.slice(0, 20).map((log) => (
               <div key={log.id} className="quran-log-row">
                 <QuranLogDetails log={log} showMember />
-                <button className="btn btn-sm btn-secondary" onClick={() => remove(log.id)}>
-                  Delete
-                </button>
+                <div className="row-btns">
+                  <button className="btn btn-sm btn-secondary" onClick={() => startEdit(log)}>
+                    Edit
+                  </button>
+                  <button className="btn btn-sm btn-secondary" onClick={() => remove(log.id)}>
+                    Delete
+                  </button>
+                </div>
               </div>
             ))
           )}
         </div>
+      )}
+
+      {editing && (
+        <form className="card" onSubmit={saveEdit}>
+          <div className="row-between" style={{ marginBottom: 12 }}>
+            <h2 className="card-title" style={{ margin: 0 }}>✏️ Edit Quran activity</h2>
+            <button type="button" className="btn btn-sm btn-secondary" onClick={cancelEdit}>
+              Cancel
+            </button>
+          </div>
+          <p className="muted" style={{ marginTop: 0 }}>
+            {editing.full_name ? `For ${editing.full_name} · ` : ''}
+            {formatDate(editing.logged_date)}. The member and date cannot be changed.
+          </p>
+
+          <div className="row">
+            <div className="field" style={{ flex: 1 }}>
+              <label>Type</label>
+              <select
+                value={editForm.kind}
+                onChange={(e) => setEditForm({ ...editForm, kind: e.target.value })}
+              >
+                <option value="recitation">Recitation</option>
+                <option value="memorization">Memorization</option>
+              </select>
+            </div>
+            <div className="field" style={{ flex: 1 }}>
+              <label>Surah (optional)</label>
+              <input
+                type="text"
+                placeholder="e.g. Al-Kahf"
+                value={editForm.surah}
+                onChange={(e) => setEditForm({ ...editForm, surah: e.target.value })}
+              />
+            </div>
+          </div>
+
+          <div className="row">
+            <div className="field" style={{ flex: 1 }}>
+              <label>Juz (optional)</label>
+              <input
+                type="number"
+                min="1"
+                max="30"
+                value={editForm.juz}
+                onChange={(e) => setEditForm({ ...editForm, juz: e.target.value })}
+              />
+            </div>
+            <div className="field" style={{ flex: 1 }}>
+              <label>Pages (optional)</label>
+              <input
+                type="number"
+                min="1"
+                value={editForm.pages}
+                onChange={(e) => setEditForm({ ...editForm, pages: e.target.value })}
+              />
+            </div>
+          </div>
+
+          <div className="field">
+            <label>Note (optional)</label>
+            <input
+              type="text"
+              placeholder="Anything to remember"
+              value={editForm.note}
+              onChange={(e) => setEditForm({ ...editForm, note: e.target.value })}
+            />
+          </div>
+
+          <button className="btn btn-block" disabled={editBusy}>
+            {editBusy ? 'Saving…' : 'Save changes'}
+          </button>
+        </form>
       )}
     </div>
   );

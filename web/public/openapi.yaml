@@ -987,6 +987,43 @@ paths:
               schema: { $ref: '#/components/schemas/Error' }
 
   /activity/quran/{id}:
+    put:
+      tags: [Activity]
+      summary: Edit a Quran log
+      description: |
+        Own, a dependent's, or any member for teachers/admins.
+
+        Only the CONTENT is editable — `kind`, `surah`, `juz`, `pages` and
+        `note`. The member the log belongs to and its date cannot be changed, so
+        an edit can never move a record to another child or backdate it. Every
+        edit stamps `updated_by`/`updated_at`, which the UI shows as
+        "✏️ edited by …".
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [kind]
+              properties:
+                kind: { type: string, enum: [recitation, memorization] }
+                surah: { type: string, nullable: true }
+                juz: { type: integer, minimum: 1, maximum: 30, nullable: true }
+                pages: { type: integer, minimum: 1, nullable: true }
+                note: { type: string, nullable: true }
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  log: { type: object }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
     delete:
       tags: [Activity]
       summary: Delete a Quran log

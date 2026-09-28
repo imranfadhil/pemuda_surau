@@ -462,7 +462,7 @@ Auth column: **–** = public, **user** = any logged-in member, **cap** = requir
 | DELETE | `/api/activity/merits/:id` | cap `manageMerits` | Revoke a merit |
 | GET | `/api/activity/quran/me` | user | My Quran logs |
 | GET/POST | `/api/activity/quran` | cap `manageQuran` (list) / user (log) | List / log Quran activity |
-| DELETE | `/api/activity/quran/:id` | user | Delete a Quran log |
+| PUT/DELETE | `/api/activity/quran/:id` | user | Edit / delete a Quran log |
 | GET | `/api/dashboard/stats` | – | Overall stats |
 | GET | `/api/dashboard/weekly` | – | Weekly activity (last 7 days) |
 | GET | `/api/dashboard/leaderboard` | – | Rankings (`?period=month\|year\|all&category=…`) |

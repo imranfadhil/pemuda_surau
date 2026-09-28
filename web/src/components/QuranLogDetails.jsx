@@ -42,6 +42,9 @@ export default function QuranLogDetails({ log, showMember = false, className = '
 
       <div className="muted quran-byline">
         {log.logged_by_name ? `Recorded by ${log.logged_by_name}` : 'Self-logged'}
+        {log.updated_by_name && (
+          <span className="quran-edited"> · ✏️ edited by {log.updated_by_name}</span>
+        )}
       </div>
     </div>
   );

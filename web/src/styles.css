@@ -695,6 +695,11 @@ textarea:focus {
   font-size: 0.78rem;
 }
 
+.quran-edited {
+  color: #b45309;
+  font-weight: 600;
+}
+
 /* ---- Camera ---- */
 .camera-wrap {
   position: relative;

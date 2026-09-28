@@ -95,6 +95,7 @@ export const api = {
   myQuran: () => request('/activity/quran/me'),
   listQuran: () => request('/activity/quran'),
   logQuran: (payload) => request('/activity/quran', { method: 'POST', body: payload }),
+  updateQuran: (id, payload) => request(`/activity/quran/${id}`, { method: 'PUT', body: payload }),
   deleteQuran: (id) => request(`/activity/quran/${id}`, { method: 'DELETE' }),
 
   listPrograms: (includePast = false) => request(`/programs?includePast=${includePast}`),

@@ -39,6 +39,20 @@ const quranSchema = z.object({
   ...verificationFields,
 });
 
+/**
+ * Editing an existing log. Deliberately has NO `forUserId` — the member a log
+ * belongs to cannot be changed, so an edit can never move a record to another
+ * child. No face/location either: the record already exists and the edit is
+ * attributed via `updated_by`.
+ */
+const quranEditSchema = z.object({
+  kind: z.enum(['recitation', 'memorization']),
+  surah: z.string().max(120).optional().nullable(),
+  juz: z.number().int().min(1).max(30).optional().nullable(),
+  pages: z.number().int().min(1).max(1000).optional().nullable(),
+  note: z.string().max(500).optional().nullable(),
+});
+
 function todayInTimezone() {
   return dateInTz(new Date(), config.prayer.timezone);
 }
@@ -215,9 +229,10 @@ router.get(
   requireAuth,
   asyncHandler(async (req, res) => {
     const { rows } = await query(
-      `SELECT q.*, l.full_name AS logged_by_name
+      `SELECT q.*, l.full_name AS logged_by_name, e.full_name AS updated_by_name
        FROM quran_logs q
        LEFT JOIN users l ON l.id = q.logged_by
+       LEFT JOIN users e ON e.id = q.updated_by
        WHERE q.user_id = $1
        ORDER BY q.logged_date DESC, q.logged_at DESC LIMIT 100`,
       [req.user.sub],
@@ -229,10 +244,12 @@ router.get(
     // pages/note a teacher recorded — that detail is the whole point of the
     // record for a parent, so it is returned in full.
     const { rows: family } = await query(
-      `SELECT q.*, u.full_name, u.id AS member_id, l.full_name AS logged_by_name
+      `SELECT q.*, u.full_name, u.id AS member_id, l.full_name AS logged_by_name,
+              e.full_name AS updated_by_name
        FROM quran_logs q
        JOIN users u ON u.id = q.user_id
        LEFT JOIN users l ON l.id = q.logged_by
+       LEFT JOIN users e ON e.id = q.updated_by
        WHERE u.guardian_id = $1 OR u.co_guardian_id = $1
        ORDER BY q.logged_date DESC, q.logged_at DESC LIMIT 50`,
       [req.user.sub],
@@ -249,10 +266,11 @@ router.get(
   requireCapability('manageQuran'),
   asyncHandler(async (req, res) => {
     const { rows } = await query(
-      `SELECT q.*, u.full_name, l.full_name AS logged_by_name
+      `SELECT q.*, u.full_name, l.full_name AS logged_by_name, e.full_name AS updated_by_name
        FROM quran_logs q
        JOIN users u ON u.id = q.user_id
        LEFT JOIN users l ON l.id = q.logged_by
+       LEFT JOIN users e ON e.id = q.updated_by
        ORDER BY q.logged_date DESC, q.logged_at DESC
        LIMIT 100`,
     );
@@ -328,6 +346,49 @@ router.post(
       ],
     );
     res.status(201).json({ log: rows[0] });
+  }),
+);
+
+/**
+ * Edit a Quran log (own, a dependent's, or any member for teachers/admins).
+ *
+ * Only the CONTENT is editable — kind, surah, juz, pages and note. The member
+ * it belongs to (`user_id`), the date and the original `logged_by` are NOT
+ * changeable, so an edit can never move a record to another child or backdate
+ * it. Every edit stamps `updated_by`/`updated_at` so a correction is visible
+ * rather than silent.
+ */
+router.put(
+  '/quran/:id',
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const parsed = quranEditSchema.safeParse(req.body);
+    if (!parsed.success) throw httpError(400, 'Invalid Quran log data');
+    const { kind, surah, juz, pages, note } = parsed.data;
+
+    const canManage = roleHasCapability(req.user.role, 'manageQuran');
+    const { rows } = await query(
+      `UPDATE quran_logs q
+       SET kind = $1, surah = $2, juz = $3, pages = $4, note = $5,
+           updated_at = now(), updated_by = $6
+       FROM users u
+       WHERE q.id = $7 AND q.user_id = u.id
+         AND ($8 = TRUE OR u.id = $9 OR u.guardian_id = $9 OR u.co_guardian_id = $9)
+       RETURNING q.*`,
+      [
+        kind,
+        surah ?? null,
+        juz ?? null,
+        pages ?? null,
+        note ?? null,
+        req.user.sub,
+        req.params.id,
+        canManage,
+        req.user.sub,
+      ],
+    );
+    if (!rows[0]) throw httpError(404, 'Log not found');
+    res.json({ log: rows[0] });
   }),
 );
 

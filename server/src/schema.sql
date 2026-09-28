@@ -134,6 +134,12 @@ CREATE TABLE IF NOT EXISTS quran_logs (
 CREATE INDEX IF NOT EXISTS idx_quran_user ON quran_logs (user_id, logged_date DESC);
 CREATE INDEX IF NOT EXISTS idx_quran_date ON quran_logs (logged_date DESC);
 
+-- A Quran log can be corrected after the fact (a teacher fixing a typo in the
+-- surah, juz or pages). Because the record feeds a child's score, every edit is
+-- stamped with who made it and when, so a change is never silent.
+ALTER TABLE quran_logs ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ;
+ALTER TABLE quran_logs ADD COLUMN IF NOT EXISTS updated_by UUID REFERENCES users(id) ON DELETE SET NULL;
+
 -- ---------------------------------------------------------------------------
 -- Idempotent migrations for databases created before these columns existed.
 -- ---------------------------------------------------------------------------
