@@ -251,13 +251,36 @@ router.post(
 
     const targetUserId = await resolveQuranTarget(req.user, forUserId);
 
-    // Recording for someone else (staff flow) requires presence at the surau.
-    // The face scan is optional - if one was provided, verify it matches.
-    if (targetUserId !== req.user.sub) {
-      assertWithinGeofence(latitude, longitude);
-      if (descriptor) {
-        await assertFaceMatches(targetUserId, descriptor);
+    // Every Quran log must happen at the surau - whether a teacher is recording
+    // for a member or a member is logging their own recitation.
+    assertWithinGeofence(latitude, longitude);
+
+    // Rate limit: at most one log per member per cooldown window, so a member
+    // can't inflate their score with rapid repeat submissions.
+    const cooldown = config.quran.cooldownMinutes;
+    if (cooldown > 0) {
+      const { rows: recent } = await query(
+        `SELECT logged_at FROM quran_logs
+         WHERE user_id = $1 AND logged_at > now() - ($2 || ' minutes')::interval
+         ORDER BY logged_at DESC LIMIT 1`,
+        [targetUserId, String(cooldown)],
+      );
+      if (recent[0]) {
+        const elapsedMin = Math.floor((Date.now() - new Date(recent[0].logged_at).getTime()) / 60000);
+        const waitMin = Math.max(1, cooldown - elapsedMin);
+        const err = httpError(
+          429,
+          `Already logged in the last ${cooldown} minutes. Please try again in about ${waitMin} minute(s).`,
+        );
+        err.code = 'QURAN_COOLDOWN';
+        err.retryAfterMinutes = waitMin;
+        throw err;
       }
+    }
+
+    // Recording for another member: verify the face when one was provided.
+    if (targetUserId !== req.user.sub && descriptor) {
+      await assertFaceMatches(targetUserId, descriptor);
     }
 
     const { rows } = await query(

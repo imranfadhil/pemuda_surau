@@ -47,6 +47,19 @@ export const config = {
     enabled: (process.env.GEOFENCE_ENABLED || 'true') !== 'false',
     radiusMeters: Number(process.env.GEOFENCE_RADIUS_METERS || 150),
   },
+  // Registration gate: a NEW account may only be created within this radius of
+  // the surau (anti-abuse). Deliberately far wider than the check-in radius -
+  // it covers the "go home first, then sign up" gap. Applies to new accounts
+  // only, so existing members can always log in from anywhere.
+  registration: {
+    geofenceEnabled: (process.env.REGISTRATION_GEOFENCE_ENABLED || 'true') !== 'false',
+    radiusMeters: Number(process.env.REGISTRATION_GEOFENCE_RADIUS_METERS || 1500),
+  },
+  // Quran self-logging: every log must be at the surau, and at most one log per
+  // member per this many minutes.
+  quran: {
+    cooldownMinutes: Number(process.env.QURAN_LOG_COOLDOWN_MINUTES || 60),
+  },
   // How OTP codes are delivered: telegram | sms | console
   otpChannel: process.env.OTP_CHANNEL || 'console',
   // Public base URL of the app (used for Telegram webhook registration)

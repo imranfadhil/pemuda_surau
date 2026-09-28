@@ -9,10 +9,47 @@ import { deliverOtp, canReachUser } from '../utils/otpDelivery.js';
 import { isTelegramConfigured, buildBotUrl } from '../utils/telegram.js';
 import { capabilitiesFor } from '../utils/roles.js';
 import { ageFromBirthDate, toDateString } from '../utils/age.js';
+import { isValidCoordinate, withinGeofence } from '../utils/geo.js';
 
 const router = Router();
 
 const phoneSchema = z.string().min(8).max(20);
+
+/**
+ * New registrations must happen near the surau (anti-abuse). Only applied when
+ * an account is about to be CREATED, so existing members are never locked out
+ * of logging in from elsewhere.
+ *
+ * Coordinates are client-supplied, so this deters casual abuse rather than a
+ * determined location spoofer; the OTP is still the real identity control.
+ */
+function assertWithinRegistrationArea(latitude, longitude) {
+  if (!config.registration.geofenceEnabled) return;
+
+  if (!isValidCoordinate(latitude, longitude)) {
+    const err = httpError(
+      403,
+      'We need your location to register. Please allow location access and try again.',
+    );
+    err.code = 'REGISTRATION_LOCATION_REQUIRED';
+    throw err;
+  }
+
+  const { ok, distance } = withinGeofence(latitude, longitude, {
+    latitude: config.prayer.latitude,
+    longitude: config.prayer.longitude,
+    radiusMeters: config.registration.radiusMeters,
+  });
+  if (!ok) {
+    const err = httpError(
+      403,
+      `Registration is only allowed near the surau. You are about ${distance} m away ` +
+        `(the limit is ${config.registration.radiusMeters} m).`,
+    );
+    err.code = 'REGISTRATION_TOO_FAR';
+    throw err;
+  }
+}
 
 /**
  * Public: how a user can sign in.
@@ -113,6 +150,8 @@ router.post(
     let isNewUser = false;
 
     if (!user) {
+      // Brand-new account: must be created near the surau.
+      assertWithinRegistrationArea(req.body?.latitude, req.body?.longitude);
       const role = config.adminPhones.includes(phone) ? 'admin' : 'youth';
       const inserted = await query(
         `INSERT INTO users (phone, full_name, role)

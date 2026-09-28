@@ -2,7 +2,10 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../lib/api.js';
 import { useAuth } from '../lib/auth.jsx';
+import { getPosition } from '../lib/geo.js';
 import { SURAU } from '../lib/constants.js';
+
+const LOCATION_CODES = ['REGISTRATION_LOCATION_REQUIRED', 'REGISTRATION_TOO_FAR'];
 
 export default function LoginPage() {
   const { login } = useAuth();
@@ -15,6 +18,7 @@ export default function LoginPage() {
   const [needsAdminHelp, setNeedsAdminHelp] = useState(false);
   const [telegram, setTelegram] = useState({ available: false, botUrl: null, botUsername: null });
   const [error, setError] = useState('');
+  const [locationRetry, setLocationRetry] = useState(false);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -47,13 +51,27 @@ export default function LoginPage() {
   async function verifyOtp(e) {
     e.preventDefault();
     setError('');
+    setLocationRetry(false);
     setBusy(true);
     try {
-      const res = await api.verifyOtp(phone, code);
+      // The server only needs coordinates when this OTP creates a NEW account
+      // (registration is gated to the surau area). Existing members log in from
+      // anywhere, so a location failure must not block them. Most browsers
+      // reuse a recent fix, so this is cheap.
+      let location = {};
+      try {
+        const pos = await getPosition({ timeout: 8000 });
+        location = { latitude: pos.latitude, longitude: pos.longitude };
+      } catch {
+        // Ignored: the server tells us if location was actually required.
+      }
+
+      const res = await api.verifyOtp(phone, code, location);
       login(res.token, res.user);
       navigate(res.needsProfile ? '/register' : '/home', { replace: true });
     } catch (err) {
       setError(err.message);
+      setLocationRetry(LOCATION_CODES.includes(err.code));
     } finally {
       setBusy(false);
     }
@@ -106,7 +124,17 @@ export default function LoginPage() {
           </a>
         </div>
 
-        {error && <div className="alert alert-error">{error}</div>}
+        {error && (
+          <div className="alert alert-error">
+            {error}
+            {locationRetry && (
+              <div className="muted" style={{ marginTop: 8 }}>
+                Allow location access in your browser, then tap “Verify &amp; continue” again —
+                registration is only possible near the surau.
+              </div>
+            )}
+          </div>
+        )}
 
         {step === 'phone' ? (
           <>

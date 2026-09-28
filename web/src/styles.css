@@ -942,32 +942,34 @@ textarea:focus {
   }
 }
 
-/* Slim footer strip on the kiosk: community group QR + label. */
-.kiosk-footer {
+/* Community group link, sitting under the stats in the kiosk sidebar. */
+.kiosk-community {
   flex-shrink: 0;
   display: flex;
   align-items: center;
-  gap: 14px;
-  padding: 8px 14px;
-  border-radius: var(--radius);
-  background: rgba(255, 255, 255, 0.92);
-  color: var(--slate-900);
+  gap: 12px;
 }
 
-.kiosk-footer-text {
-  font-size: 0.95rem;
-}
-
-.kiosk-footer-qr {
+.kiosk-community-qr {
   padding: 4px;
-  border-radius: 8px;
+  border-radius: 10px;
   flex-shrink: 0;
 }
 
-.kiosk-footer-hint {
-  font-size: 0.8rem;
+.kiosk-community-text {
+  min-width: 0;
+}
+
+.kiosk-community-title {
+  font-weight: 700;
+  font-size: 0.9rem;
+  line-height: 1.25;
+}
+
+.kiosk-community-sub {
+  font-size: 0.75rem;
   color: var(--slate-600);
-  margin-left: auto;
+  line-height: 1.3;
 }
 
 /* ---- Mobile fallbacks for the public landing page ---- */

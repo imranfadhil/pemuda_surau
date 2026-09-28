@@ -30,6 +30,9 @@ async function request(path, { method = 'GET', body, auth = true } = {}) {
     const message = data?.error || `Request failed (${res.status})`;
     const err = new Error(message);
     err.status = res.status;
+    // Machine-readable hint from the server (e.g. REGISTRATION_TOO_FAR).
+    err.code = data?.code;
+    err.retryAfterMinutes = data?.retryAfterMinutes;
     throw err;
   }
   return data;
@@ -38,7 +41,12 @@ async function request(path, { method = 'GET', body, auth = true } = {}) {
 export const api = {
   loginOptions: () => request('/auth/login-options', { auth: false }),
   requestOtp: (phone) => request('/auth/request-otp', { method: 'POST', body: { phone }, auth: false }),
-  verifyOtp: (phone, code) => request('/auth/verify-otp', { method: 'POST', body: { phone, code }, auth: false }),
+  verifyOtp: (phone, code, location = {}) =>
+    request('/auth/verify-otp', {
+      method: 'POST',
+      body: { phone, code, latitude: location.latitude, longitude: location.longitude },
+      auth: false,
+    }),
   me: () => request('/auth/me'),
 
   updateProfile: (profile) => request('/users/me', { method: 'PUT', body: profile }),

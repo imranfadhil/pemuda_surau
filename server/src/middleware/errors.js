@@ -6,9 +6,14 @@ export function notFound(req, res) {
 export function errorHandler(err, req, res, next) {
   console.error('[error]', err);
   const status = err.status || 500;
-  res.status(status).json({
+  const body = {
     error: err.expose ? err.message : 'Internal server error',
-  });
+  };
+  // Optional machine-readable code so the client can react (e.g. ask for
+  // location during registration, or show a cooldown countdown).
+  if (err.code) body.code = err.code;
+  if (err.retryAfterMinutes) body.retryAfterMinutes = err.retryAfterMinutes;
+  res.status(status).json(body);
 }
 
 export function asyncHandler(fn) {

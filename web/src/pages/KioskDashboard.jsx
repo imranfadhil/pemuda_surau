@@ -430,19 +430,19 @@ export default function KioskDashboard({ publicHome = false }) {
               <div className="label">🏅 Merits</div>
             </div>
           </div>
+
+          {/* Community group link, tucked under the stats in the right column. */}
+          <div className="card kiosk-community">
+            <div className="qr-box kiosk-community-qr">
+              <QRCodeSVG value={COMMUNITY.whatsappUrl} size={72} level="L" marginSize={0} />
+            </div>
+            <div className="kiosk-community-text">
+              <div className="kiosk-community-title">💬 Join our {COMMUNITY.label}</div>
+              <div className="kiosk-community-sub">Program updates &amp; announcements</div>
+            </div>
+          </div>
         </aside>
       </div>
-
-      {/* Slim footer strip: join the community group (QR for phones + text). */}
-      <footer className="kiosk-footer">
-        <span className="kiosk-footer-text">
-          💬 <strong>Join our {COMMUNITY.label}</strong> for program updates & announcements
-        </span>
-        <div className="qr-box kiosk-footer-qr">
-          <QRCodeSVG value={COMMUNITY.whatsappUrl} size={64} level="L" marginSize={0} />
-        </div>
-        <span className="kiosk-footer-hint">Scan with your phone →</span>
-      </footer>
     </div>
   );
 }

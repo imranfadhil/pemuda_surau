@@ -63,10 +63,11 @@ export default function QuranPage() {
     setNotice('');
     setBusy(true);
     try {
-      // Recording for another member requires presence at the surau. Reuse the
-      // scanned location when we have it, otherwise fetch it now.
+      // Every Quran log must be recorded at the surau (the server enforces the
+      // geofence). Reuse the scanned location when we have it, otherwise fetch
+      // it now.
       let location = proof;
-      if (recordingForOther && !location) {
+      if (!location) {
         setNotice('Getting location…');
         const pos = await getPosition();
         location = { latitude: pos.latitude, longitude: pos.longitude };
@@ -120,6 +121,9 @@ export default function QuranPage() {
         {canManage
           ? 'Record recitation and memorization for members at the surau.'
           : 'Log your recitation and memorization to earn badges.'}
+      </p>
+      <p className="muted" style={{ marginTop: -8 }}>
+        📍 Must be at the surau · one log per hour per member.
       </p>
 
       {error && <div className="alert alert-error">{error}</div>}
