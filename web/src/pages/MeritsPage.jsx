@@ -41,7 +41,10 @@ export default function MeritsPage() {
     loadMine();
     loadRecent();
     if (canManage) {
-      api.listUsers().then((d) => setMembers(d.users)).catch(() => {});
+      api
+        .listUsers()
+        .then((d) => setMembers(d.users))
+        .catch((e) => setError(e.message));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
