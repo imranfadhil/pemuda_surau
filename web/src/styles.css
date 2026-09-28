@@ -687,6 +687,134 @@ textarea:focus {
   color: white;
 }
 
+/* ---- DataTable ---- */
+.datatable {
+  margin-top: 12px;
+}
+
+.datatable-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.datatable-search {
+  flex: 1;
+  min-width: 180px;
+  padding: 9px 12px;
+  font-size: 0.9rem;
+}
+
+.datatable-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.8rem;
+  color: var(--slate-600);
+}
+
+.datatable-meta select {
+  padding: 7px 10px;
+  font-size: 0.8rem;
+  width: auto;
+}
+
+/* Horizontal scroll keeps wide tables usable on a phone. */
+.datatable-scroll {
+  overflow-x: auto;
+  border: 1px solid var(--slate-100);
+  border-radius: 12px;
+}
+
+.datatable table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+}
+
+.datatable th,
+.datatable td {
+  text-align: left;
+  padding: 10px 12px;
+  white-space: nowrap;
+}
+
+.datatable thead th {
+  position: sticky;
+  top: 0;
+  background: var(--slate-50);
+  border-bottom: 1px solid var(--slate-200);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--slate-600);
+  user-select: none;
+}
+
+.datatable th.sortable {
+  cursor: pointer;
+}
+
+.datatable th.sortable:hover {
+  color: var(--teal-700);
+}
+
+.datatable th.sorted {
+  color: var(--teal-700);
+}
+
+.datatable .sort-ind {
+  margin-left: 5px;
+  font-size: 0.62rem;
+  opacity: 0.6;
+}
+
+.datatable tbody tr {
+  border-bottom: 1px solid var(--slate-100);
+}
+
+.datatable tbody tr:last-child {
+  border-bottom: none;
+}
+
+.datatable tbody tr:hover {
+  background: var(--teal-50);
+}
+
+.datatable .ta-right,
+.datatable th.ta-right {
+  text-align: right;
+}
+
+.datatable .ta-center,
+.datatable th.ta-center {
+  text-align: center;
+}
+
+.datatable-empty {
+  text-align: center;
+  color: var(--slate-600);
+  padding: 24px 12px;
+}
+
+.datatable-pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  margin-top: 12px;
+  font-size: 0.82rem;
+  color: var(--slate-600);
+}
+
+.datatable .row-btns {
+  display: inline-flex;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
 .auth-wrap {
   min-height: 100vh;
   display: grid;

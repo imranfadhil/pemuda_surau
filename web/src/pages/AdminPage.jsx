@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { api } from '../lib/api.js';
 import { useAuth } from '../lib/auth.jsx';
+import DataTable from '../components/DataTable.jsx';
 import {
-  PRAYERS, PRAYER_LABELS, todayISO, formatDate, ROLES, ROLE_LABELS, can,
+  PRAYERS, PRAYER_LABELS, todayISO, formatDate, formatDateTime, ROLES, ROLE_LABELS, can,
 } from '../lib/constants.js';
 
 /**
@@ -87,6 +88,171 @@ export default function AdminPage() {
     }
   }
 
+  // Member table columns. Kept in a memo because DataTable uses it as a
+  // dependency for filtering/sorting.
+  const memberColumns = useMemo(
+    () => [
+      {
+        key: 'fullName',
+        label: 'Name',
+        sortable: true,
+        render: (u) => (
+          <div className="leader-name">
+            {u.fullName}
+            {u.guardianName ? (
+              <div className="muted" style={{ fontWeight: 400 }}>
+                child of {u.guardianName}
+              </div>
+            ) : null}
+          </div>
+        ),
+      },
+      {
+        key: 'phone',
+        label: 'Phone',
+        sortable: true,
+        render: (u) => u.phone || <span className="muted">no phone</span>,
+      },
+      {
+        key: 'role',
+        label: 'Role',
+        sortable: true,
+        // Dependents inherit the guardian's role, so show a pill instead.
+        render: (u) =>
+          u.isDependent ? (
+            <span className="pill">Dependent</span>
+          ) : (
+            <select
+              value={u.role}
+              onChange={(e) => changeRole(u, e.target.value)}
+              style={{ width: 'auto' }}
+              title="Change role"
+            >
+              {ROLES.map((r) => (
+                <option key={r.key} value={r.key}>
+                  {r.label}
+                </option>
+              ))}
+            </select>
+          ),
+      },
+      {
+        key: 'hasFace',
+        label: 'Face',
+        sortable: true,
+        render: (u) => (
+          <span className={`pill ${u.hasFace ? '' : 'warn'}`}>{u.hasFace ? '✓' : 'no'}</span>
+        ),
+      },
+      {
+        key: 'telegramLinked',
+        label: 'Telegram',
+        sortable: true,
+        render: (u) => (
+          <span className={`pill ${u.telegramLinked ? '' : 'warn'}`}>
+            {u.telegramLinked ? '✓' : 'no'}
+          </span>
+        ),
+      },
+      {
+        key: 'createdAt',
+        label: 'Registered',
+        sortable: true,
+        render: (u) => <span className="muted">{formatDate(u.createdAt)}</span>,
+      },
+      {
+        key: 'isActive',
+        label: 'Status',
+        sortable: true,
+        render: (u) => (
+          <span className={`pill ${u.isActive ? '' : 'warn'}`}>
+            {u.isActive ? 'Active' : 'Inactive'}
+          </span>
+        ),
+      },
+      {
+        key: 'actions',
+        label: 'Actions',
+        align: 'right',
+        searchValue: () => '',
+        render: (u) => (
+          <div className="row-btns">
+            <button
+              className="btn btn-sm btn-secondary"
+              disabled={codeBusy === u.id || !u.phone}
+              title={
+                u.phone
+                  ? 'Last resort: generate a code to read out if the member cannot use Telegram'
+                  : 'Dependents have no phone to log in with'
+              }
+              onClick={() => generateCode(u)}
+            >
+              {codeBusy === u.id ? '…' : 'Code'}
+            </button>
+            <button
+              className={`btn btn-sm ${u.isActive ? 'btn-secondary' : ''}`}
+              onClick={() => toggleActive(u)}
+            >
+              {u.isActive ? 'Deactivate' : 'Activate'}
+            </button>
+          </div>
+        ),
+      },
+    ],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [codeBusy],
+  );
+
+  // Daily attendance table columns.
+  const attendanceColumns = useMemo(
+    () => [
+      {
+        key: 'full_name',
+        label: 'Member',
+        sortable: true,
+        render: (row) => (
+          <div className="leader-name">
+            {row.full_name}
+            {row.guardian_name ? (
+              <div className="muted" style={{ fontWeight: 400 }}>
+                child of {row.guardian_name}
+              </div>
+            ) : null}
+          </div>
+        ),
+      },
+      {
+        key: 'prayer',
+        label: 'Prayer',
+        sortable: true,
+        // Sort by the canonical order of prayers, not alphabetically.
+        sortValue: (row) => PRAYERS.findIndex((p) => p.key === row.prayer),
+        render: (row) => PRAYER_LABELS[row.prayer] || row.prayer,
+      },
+      {
+        key: 'phone',
+        label: 'Phone',
+        sortable: true,
+        render: (row) => row.phone || <span className="muted">dependent</span>,
+      },
+      {
+        key: 'method',
+        label: 'Method',
+        sortable: true,
+        render: (row) => <span className="pill">{row.method}</span>,
+      },
+      {
+        key: 'checked_in_at',
+        label: 'Checked in',
+        sortable: true,
+        sortValue: (row) => (row.checked_in_at ? new Date(row.checked_in_at).getTime() : null),
+        render: (row) => <span className="muted">{formatDateTime(row.checked_in_at)}</span>,
+      },
+    ],
+    [],
+  );
+
+
   return (
     <div>
       <h1 className="page-title">{isAdmin ? 'Admin' : 'Staff'}</h1>
@@ -138,66 +304,21 @@ export default function AdminPage() {
       {tab === 'members' && isAdmin && (
         <div className="card">
           <h2 className="card-title">Members ({users.length})</h2>
-          <div style={{ marginTop: 12 }}>
-            {users.map((u) => (
-              <div key={u.id} className="leader-row">
-                <div className="leader-name">
-                  {u.fullName}
-                  <div className="muted" style={{ fontWeight: 400 }}>
-                    {u.phone || 'no phone (dependent)'}
-                    {u.guardianName ? ` · child of ${u.guardianName}` : ''}
-                  </div>
-                </div>
-                {u.isDependent ? (
-                  <span className="pill">Dependent</span>
-                ) : (
-                  <select
-                    value={u.role}
-                    onChange={(e) => changeRole(u, e.target.value)}
-                    style={{ width: 'auto' }}
-                    title="Change role"
-                  >
-                    {ROLES.map((r) => (
-                      <option key={r.key} value={r.key}>
-                        {r.label}
-                      </option>
-                    ))}
-                  </select>
-                )}
-                <span className={`pill ${u.hasFace ? '' : 'warn'}`}>
-                  {u.hasFace ? 'face ✓' : 'no face'}
-                </span>
-                <span className={`pill ${u.telegramLinked ? '' : 'warn'}`}>
-                  {u.telegramLinked ? 'tg ✓' : 'no tg'}
-                </span>
-                <button
-                  className="btn btn-sm btn-secondary"
-                  disabled={codeBusy === u.id || !u.phone}
-                  title={
-                    u.phone
-                      ? 'Last resort: generate a code to read out if the member cannot use Telegram'
-                      : 'Dependents have no phone to log in with'
-                  }
-                  onClick={() => generateCode(u)}
-                >
-                  {codeBusy === u.id ? '…' : 'Code'}
-                </button>
-                <button
-                  className={`btn btn-sm ${u.isActive ? 'btn-secondary' : ''}`}
-                  onClick={() => toggleActive(u)}
-                >
-                  {u.isActive ? 'Deactivate' : 'Activate'}
-                </button>
-              </div>
-            ))}
-          </div>
+          <DataTable
+            columns={memberColumns}
+            rows={users}
+            getRowKey={(u) => u.id}
+            initialSort={{ key: 'createdAt', dir: 'desc' }}
+            searchPlaceholder="Search name, phone, role…"
+            emptyMessage="No members yet."
+          />
         </div>
       )}
 
       {tab === 'attendance' && canAttendance && (
         <div className="card">
           <div className="row-between" style={{ marginBottom: 12 }}>
-            <h2 className="card-title">Attendance</h2>
+            <h2 className="card-title">Attendance ({dayAttendance.length})</h2>
             <input
               type="date"
               value={date}
@@ -205,25 +326,14 @@ export default function AdminPage() {
               style={{ width: 'auto' }}
             />
           </div>
-          {dayAttendance.length === 0 ? (
-            <p className="muted">No records for {formatDate(date)}.</p>
-          ) : (
-            dayAttendance.map((row) => (
-              <div key={row.id} className="leader-row">
-                <div className="rank-badge" style={{ background: 'var(--teal-100)', color: 'var(--teal-900)' }}>
-                  {PRAYER_LABELS[row.prayer]?.[0]}
-                </div>
-                <div className="leader-name">
-                  {row.full_name}
-                  <div className="muted" style={{ fontWeight: 400 }}>
-                    {PRAYER_LABELS[row.prayer]} · {row.phone || 'dependent'}
-                    {row.guardian_name ? ` · child of ${row.guardian_name}` : ''}
-                  </div>
-                </div>
-                <span className="pill">{row.method}</span>
-              </div>
-            ))
-          )}
+          <DataTable
+            columns={attendanceColumns}
+            rows={dayAttendance}
+            getRowKey={(row) => row.id}
+            initialSort={{ key: 'full_name', dir: 'asc' }}
+            searchPlaceholder="Search member, phone, prayer…"
+            emptyMessage={`No records for ${formatDate(date)}.`}
+          />
         </div>
       )}
 
