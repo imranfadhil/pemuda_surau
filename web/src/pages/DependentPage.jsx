@@ -26,6 +26,11 @@ export default function DependentPage() {
   const [faceStatus, setFaceStatus] = useState('');
   const [faceBusy, setFaceBusy] = useState(false);
 
+  // "Give own login" flow: set a phone number on an existing dependent.
+  const [promoting, setPromoting] = useState(null);
+  const [promotePhone, setPromotePhone] = useState('');
+  const [promoteBusy, setPromoteBusy] = useState(false);
+
   // Live framing/lighting feedback while the camera is open (paused during capture).
   const feedback = useFaceFeedback(videoRef, cameraOn, { enabled: !faceBusy });
 
@@ -157,6 +162,38 @@ export default function DependentPage() {
     setFaceStatus('');
   }
 
+  function startPromote(dep) {
+    setError('');
+    setNotice('');
+    setEnrolling(null);
+    setPromoting(dep);
+    setPromotePhone(dep.phone || '');
+  }
+
+  function cancelPromote() {
+    setPromoting(null);
+    setPromotePhone('');
+  }
+
+  async function submitPromote(e) {
+    e.preventDefault();
+    setError('');
+    setNotice('');
+    setPromoteBusy(true);
+    try {
+      await api.setDependentPhone(promoting.id, promotePhone);
+      setNotice(
+        `${promoting.fullName} can now log in with ${promotePhone} and check in on their own phone.`,
+      );
+      cancelPromote();
+      load();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setPromoteBusy(false);
+    }
+  }
+
   return (
     <div>
       <h1 className="page-title">Family</h1>
@@ -224,12 +261,13 @@ export default function DependentPage() {
         ) : (
           <div style={{ marginTop: 12 }}>
             {dependents.map((dep) => (
-              <div key={dep.id} className="leader-row">
+              <div key={dep.id} className="leader-row wrap">
                 <div className="leader-name">
                   {dep.fullName}
                   <div className="muted" style={{ fontWeight: 400 }}>
                     {ageLabel(dep.birthDate)}
                     {dep.gender ? ` · ${dep.gender}` : ''}
+                    {dep.phone ? ` · 📱 ${dep.phone}` : ''}
                   </div>
                 </div>
                 <span className={`pill ${dep.hasFace ? '' : 'warn'}`}>
@@ -237,6 +275,9 @@ export default function DependentPage() {
                 </span>
                 <button className="btn btn-sm btn-secondary" onClick={() => startEnroll(dep)}>
                   {dep.hasFace ? 'Re-enroll' : 'Enroll face'}
+                </button>
+                <button className="btn btn-sm btn-secondary" onClick={() => startPromote(dep)}>
+                  {dep.phone ? 'Change phone' : 'Give own login'}
                 </button>
                 <button className="btn btn-sm btn-secondary" onClick={() => startEdit(dep)}>
                   Edit
@@ -249,6 +290,35 @@ export default function DependentPage() {
           </div>
         )}
       </div>
+
+      {promoting && (
+        <form className="card" onSubmit={submitPromote}>
+          <div className="row-between" style={{ marginBottom: 12 }}>
+            <h2 className="card-title" style={{ margin: 0 }}>📱 Give {promoting.fullName} their own login</h2>
+            <button type="button" className="btn btn-sm btn-secondary" onClick={cancelPromote}>
+              Cancel
+            </button>
+          </div>
+          <p className="muted" style={{ marginTop: 0 }}>
+            Add a phone number so {promoting.fullName} can log in and check in on their own phone.
+            Their existing history and enrolled face are kept, and you will still see them here.
+          </p>
+          <div className="field">
+            <label htmlFor="promotePhone">Phone number</label>
+            <input
+              id="promotePhone"
+              inputMode="tel"
+              placeholder="e.g. 0123456789"
+              value={promotePhone}
+              onChange={(e) => setPromotePhone(e.target.value)}
+              required
+            />
+          </div>
+          <button className="btn" disabled={promoteBusy}>
+            {promoteBusy ? 'Saving…' : 'Give own login'}
+          </button>
+        </form>
+      )}
 
       {enrolling && (
         <div className="card">

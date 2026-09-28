@@ -4,7 +4,7 @@ import { query } from '../db.js';
 import { requireAuth, requireAdmin, requireCapability } from '../middleware/auth.js';
 import { asyncHandler, httpError } from '../middleware/errors.js';
 import { isValidDescriptor } from '../utils/face.js';
-import { generateOtp, hashOtp, otpExpiryDate } from '../utils/otp.js';
+import { generateOtp, hashOtp, otpExpiryDate, canonicalPhone, phoneVariants } from '../utils/otp.js';
 import { ROLES } from '../utils/roles.js';
 import { publicUser } from './auth.js';
 
@@ -21,6 +21,13 @@ const dependentSchema = z.object({
   fullName: z.string().min(2).max(120),
   birthDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable(),
   gender: z.enum(['male', 'female']).optional().nullable(),
+});
+
+// Give an existing dependent their own phone number so they can log in and
+// check themselves in. The account keeps its id (history + enrolled face) and
+// stays linked to the guardian.
+const promoteSchema = z.object({
+  phone: z.string().min(8).max(20),
 });
 
 /** Update own profile. */
@@ -95,6 +102,47 @@ router.post(
       [fullName, birthDate ?? null, gender ?? null, req.user.sub],
     );
     res.status(201).json({ dependent: publicUser(rows[0]) });
+  }),
+);
+
+/**
+ * Give a dependent their own phone number so they can log in.
+ *
+ * The row is UPDATED, not recreated: attendance, Quran logs, merits and the
+ * enrolled face descriptor all carry over, and `guardian_id` is kept so the
+ * guardian still sees the child in the family view. Either the guardian
+ * themselves or an admin may do this.
+ */
+router.post(
+  '/me/dependents/:id/phone',
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const parsed = promoteSchema.safeParse(req.body);
+    if (!parsed.success) throw httpError(400, 'A valid phone number is required');
+    const phone = canonicalPhone(parsed.data.phone);
+
+    const isAdmin = req.user.role === 'admin';
+    const { rows: depRows } = await query(
+      isAdmin
+        ? `SELECT * FROM users WHERE id = $1 AND guardian_id IS NOT NULL`
+        : `SELECT * FROM users WHERE id = $1 AND guardian_id = $2`,
+      isAdmin ? [req.params.id] : [req.params.id, req.user.sub],
+    );
+    const dependent = depRows[0];
+    if (!dependent) throw httpError(404, 'Dependent not found');
+
+    // Reject a number already used by another account (match any spelling).
+    const { rows: existing } = await query(
+      `SELECT id FROM users WHERE phone = ANY($1::text[]) AND id <> $2`,
+      [phoneVariants(phone), dependent.id],
+    );
+    if (existing[0]) throw httpError(409, 'That phone number is already registered to another account.');
+
+    const { rows } = await query(
+      `UPDATE users SET phone = $1, updated_at = now() WHERE id = $2 RETURNING *`,
+      [phone, dependent.id],
+    );
+    res.json({ dependent: publicUser(rows[0]) });
   }),
 );
 

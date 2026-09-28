@@ -48,6 +48,8 @@ export const api = {
   updateDependent: (id, dependent) => request(`/users/me/dependents/${id}`, { method: 'PUT', body: dependent }),
   enrollDependentFace: (id, descriptor) =>
     request(`/users/me/dependents/${id}/face`, { method: 'POST', body: { descriptor } }),
+  setDependentPhone: (id, phone) =>
+    request(`/users/me/dependents/${id}/phone`, { method: 'POST', body: { phone } }),
   deleteDependent: (id) => request(`/users/me/dependents/${id}`, { method: 'DELETE' }),
   listUsers: () => request('/users'),
   setUserActive: (id, isActive) => request(`/users/${id}/active`, { method: 'PATCH', body: { isActive } }),

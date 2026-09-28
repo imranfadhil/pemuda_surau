@@ -481,6 +481,16 @@ textarea:focus {
   font-weight: 600;
 }
 
+/* Rows that carry a name plus several action buttons (e.g. the Family list):
+   let them wrap instead of overflowing on a phone. */
+.leader-row.wrap {
+  flex-wrap: wrap;
+}
+
+.leader-row.wrap .leader-name {
+  flex: 1 1 100%;
+}
+
 .leader-score {
   font-weight: 700;
   color: var(--teal-700);

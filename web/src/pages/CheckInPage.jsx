@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../lib/api.js';
+import { useAuth } from '../lib/auth.jsx';
 import {
   startCamera, stopCamera, captureDescriptor, loadModels, qualityMessage,
 } from '../lib/face.js';
@@ -24,6 +25,7 @@ function countdown(targetIso, now) {
 }
 
 export default function CheckInPage() {
+  const { user } = useAuth();
   const videoRef = useRef(null);
   const streamRef = useRef(null);
 
@@ -70,6 +72,9 @@ export default function CheckInPage() {
   }, []);
 
   const selected = members.find((m) => m.id === selectedId) || members[0] || null;
+  // A guardian scans a dependent with the rear camera — but a child who has
+  // their own login is checking *themselves* in, so treat that as a selfie.
+  const selfCheckIn = Boolean(selected) && selected.id === user?.id;
   const today = selected?.prayers || [];
   const current = win?.current || null;
   const next = win?.next || null;
@@ -83,12 +88,9 @@ export default function CheckInPage() {
       await loadModels();
       // Scanning a dependent means the guardian is holding the phone up to the
       // child, so use the rear camera; self check-in uses the front camera.
-      streamRef.current = await startCamera(
-        videoRef.current,
-        selected?.isDependent ? 'environment' : 'user',
-      );
+      streamRef.current = await startCamera(videoRef.current, selfCheckIn ? 'user' : 'environment');
       setCameraOn(true);
-      setStatus(`Center ${selected?.isDependent ? `${selected.fullName}'s` : 'your'} face and tap Verify.`);
+      setStatus(`Center ${selfCheckIn ? 'your' : `${selected?.fullName}'s`} face and tap Verify.`);
     } catch (err) {
       setError(`Camera error: ${err.message}. Please allow camera access.`);
       setStatus('');
@@ -120,7 +122,7 @@ export default function CheckInPage() {
         latitude: pos.latitude,
         longitude: pos.longitude,
       };
-      if (selected?.isDependent) payload.forUserId = selected.id;
+      if (!selfCheckIn) payload.forUserId = selected.id;
       setStatus('Verifying…');
       const res = await api.checkIn(payload);
       setResult(res);
@@ -219,7 +221,7 @@ export default function CheckInPage() {
             <div className="camera-wrap">
               <video
                 ref={videoRef}
-                className={selected?.isDependent ? undefined : 'camera-mirror'}
+                className={selfCheckIn ? 'camera-mirror' : undefined}
                 playsInline
                 muted
               />

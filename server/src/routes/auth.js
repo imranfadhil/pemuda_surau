@@ -124,7 +124,10 @@ router.post(
     }
 
     if (!user.is_active) throw httpError(403, 'This account has been deactivated');
-    if (user.guardian_id) {
+    // A dependent (child) may only log in once a guardian has given them their
+    // own phone number (see POST /users/me/dependents/:id/phone). Until then
+    // the account has no phone at all and the guardian checks them in.
+    if (user.guardian_id && !user.phone) {
       throw httpError(403, 'This is a dependent account. Please ask your guardian to check in for you.');
     }
 
@@ -165,6 +168,9 @@ export function publicUser(user) {
     telegramUsername: user.telegram_username || null,
     guardianId: user.guardian_id || null,
     isDependent: Boolean(user.guardian_id),
+    // A dependent given their own phone number can log in and check themselves
+    // in; a phone-less dependent must be checked in by their guardian.
+    canSelfCheckIn: Boolean(user.phone),
     createdAt: user.created_at,
   };
 }
