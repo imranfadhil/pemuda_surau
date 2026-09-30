@@ -14,14 +14,14 @@
  * Points per prayer check-in.
  *
  * Subuh is worth the most because it is the hardest to attend (it is before
- * dawn), and Isyak is worth more than the daytime prayers for the same reason.
+ * dawn). The other prayers, including Isyak, are worth the standard value.
  */
 export const PRAYER_POINTS = {
-  subuh: 15,
+  subuh: 10,
   zuhur: 5,
   asar: 5,
   maghrib: 5,
-  isyak: 10,
+  isyak: 5,
 };
 
 /** Points for each Quran activity (recitation or memorization). */

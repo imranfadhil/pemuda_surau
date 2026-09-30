@@ -38,6 +38,12 @@ export const config = {
     // Check-in window: opens N minutes before the adhan, closes M minutes after.
     beforeMinutes: Number(process.env.PRAYER_WINDOW_BEFORE_MINUTES || 15),
     afterMinutes: Number(process.env.PRAYER_WINDOW_AFTER_MINUTES || 60),
+    // Per-prayer overrides for how early the window opens. Isyak defaults to 0
+    // because Maghrib and Isyak are very close together, so opening Isyak early
+    // would overlap the Maghrib window.
+    beforeMinutesByPrayer: {
+      isyak: Number(process.env.PRAYER_WINDOW_BEFORE_MINUTES_ISYAK || 0),
+    },
     // When false, the client may pick any prayer (legacy behaviour).
     enforceWindow: (process.env.PRAYER_WINDOW_ENFORCED || 'true') !== 'false',
   },

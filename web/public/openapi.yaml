@@ -1104,7 +1104,7 @@ paths:
       tags: [Dashboard]
       summary: Leaderboard
       description: |
-        Public. Ranks members by POINTS (Subuh 15, Isyak 10, other prayers 5,
+        Public. Ranks members by POINTS (Subuh 10, other prayers 5,
         each Quran activity 5, merits 1-10).
 
         **Youth only** — members aged 19 or over (and members with no birth

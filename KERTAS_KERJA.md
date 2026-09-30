@@ -1,8 +1,8 @@
 
 # KERTAS KERJA
 
-## CADANGAN PERLAKSANAAN SISTEM PEMUDA SURAU AL-ABQORI
-### Aplikasi Web Pengejaran Solat, Al-Quran dan Amal Kebajikan
+## CADANGAN PERLAKSANAAN PROGRAM PEMUDA SURAU AL-ABQORI
+### Rekod Solat, Al-Quran dan Amal Kebajikan Anak Remaja di Surau
 
 ---
 
@@ -10,14 +10,39 @@
 |---|---|
 | **Disediakan untuk** | Ahli Jawatankuasa (AJK) Surau Al-Abqori |
 | **Lokasi** | Surau Al-Abqori, Jalan Cerdik, Taman Universiti, 43000 Kajang, Selangor |
-| **Tarikh** | 27 September 2026 |
+| **Tarikh** | 30 September 2026 |
 | **Status** | Cadangan untuk pertimbangan AJK |
+
+---
+
+## RINGKASAN EKSEKUTIF
+
+Sistem aplikasi web Pemuda Surau Al-Abqori telah siap dibangunkan dan diuji, dan kini sedia
+untuk dilaksanakan secara rasmi. Sistem ini merekod kehadiran solat berjemaah, aktiviti
+Al-Quran (tilawah dan hafazan) serta amal kebajikan (merit) secara automatik menggunakan
+pengesahan wajah dan lokasi (geofencing).
+
+**Perkara utama untuk keputusan AJK:**
+
+| Perkara | Ringkasan |
+|---|---|
+| **Tujuan** | Meningkatkan penyertaan anak remaja dalam solat berjemaah, Al-Quran dan amal kebajikan melalui penjejakan yang telus dan automatik. |
+| **Kos Infrastruktur** | **RM 64.86 sebulan** — bersamaan **RM 778.32 setahun**. |
+| **Kos Hadiah** | **RM 3,400.00 setahun** (hadiah bulanan RM 2,400.00 + hadiah mega tahunan RM 1,000.00). |
+| **Jumlah Peruntukan** | **RM 4,178.32 setahun** (infrastruktur + hadiah). |
+| **Kos Sehari** | Lebih kurang **RM 2.16 sehari** untuk infrastruktur teknologi. |
+| **Faedah Utama** | Pengiktirafan telus, penjimatan masa AJK, data masa nyata dan peningkatan kehadiran anak remaja. |
+| **Risiko Utama** | Privasi wajah (hanya kod matematik disimpan, bukan gambar) dan sambungan internet (mitigasi disediakan). |
+
+**Keputusan yang dipohon:** Meluluskan perlaksanaan sistem, peruntukan infrastruktur
+**RM 778.32 setahun**, hadiah bulanan **RM 200.00 sebulan**, hadiah mega tahunan
+**RM 1,000.00**.
 
 ---
 
 ## 1.0 PENGENALAN
 
-Surau Al-Abqori mempunyai program pembangunan belia yang bertujuan menggalakkan penyertaan
+Surau Al-Abqori mempunyai program pembangunan anak remaja yang bertujuan menggalakkan penyertaan
 golongan muda dalam solat berjemaah, pembacaan Al-Quran dan amal kebajikan. Pada masa ini,
 kehadiran dan penyertaan ahli direkodkan secara manual, yang menyukarkan pemantauan,
 penilaian dan pemberian penghargaan secara konsisten.
@@ -36,7 +61,7 @@ dibuat di dalam kawasan surau.
 
 ### 2.1 Objektif Umum
 
-Meningkatkan penyertaan golongan belia dalam aktiviti ibadah dan kebajikan di Surau Al-Abqori
+Meningkatkan penyertaan golongan anak remaja dalam aktiviti ibadah dan kebajikan di Surau Al-Abqori
 melalui sistem penjejakan yang telus, automatik dan menarik.
 
 ### 2.2 Objektif Khusus
@@ -63,7 +88,7 @@ melalui sistem penjejakan yang telus, automatik dan menarik.
 | **Log Masuk** | Menggunakan nombor telefon dan kod pengesahan (OTP) melalui **Telegram** — **percuma**, tanpa kos SMS. |
 | **Pengesahan Wajah** | Dijalankan dalam pelayar telefon. Hanya **kod matematik wajah (128 nilai)** disimpan — **gambar wajah tidak disimpan**. |
 | **Pengesahan Lokasi** | Rekod hanya diterima dalam radius **150 meter** dari surau. |
-| **Tetingkap Solat** | Rekod dibuka **15 minit sebelum azan** hingga **60 minit selepas azan**. |
+| **Tetingkap Solat** | Rekod dibuka **15 minit sebelum azan** hingga **60 minit selepas azan**. Bagi **Isyak**, rekod dibuka **tepat pada waktu azan** (kerana waktunya sangat hampir dengan Maghrib). |
 | **Akaun Keluarga** | Ibu bapa boleh mendaftar anak sebagai tanggungan dan mendaftarkan wajah anak. |
 
 ### 3.2 Fasa Perlaksanaan
@@ -86,10 +111,10 @@ Mata Keseluruhan = Kehadiran Solat + Bacaan Al-Quran + Hafazan Al-Quran + Merit
 
 | Kategori | Unit | Mata |
 |---|---|---|
-| Kehadiran Solat | Setiap solat berjemaah | 1 mata |
-| Bacaan Al-Quran (Tilawah) | Setiap sesi direkod | 1 mata |
-| Hafazan Al-Quran | Setiap sesi direkod | 1 mata |
-| Merit / Amal Kebajikan | Mengikut nilai yang diberi AJK | 1–100 mata |
+| Kehadiran Solat | Setiap solat berjemaah | 5 mata, kecuali Subuh 10 mata |
+| Bacaan Al-Quran (Tilawah) | Setiap sesi direkod | 5 mata |
+| Hafazan Al-Quran | Setiap sesi direkod | 5 mata |
+| Merit / Amal Kebajikan | Mengikut nilai yang diberi AJK | 1–10 mata |
 
 > **Nota:** Papan pendahulu turut menyediakan kategori berasingan bagi setiap bidang
 > (Kehadiran, Tilawah, Hafazan, Merit) supaya ahli yang cemerlang dalam bidang tertentu
@@ -120,36 +145,31 @@ Mata Keseluruhan = Kehadiran Solat + Bacaan Al-Quran + Hafazan Al-Quran + Merit
 
 | Item | Butiran | Kos (USD) | Kos (RM) |
 |---|---|---|---|
-| Pelayan (Droplet) | 1 vCPU, 2 GB RAM — menjalankan pangkalan data, API, laman web dan terowong | $12.00 | RM 56.40 |
+| Pelayan (Droplet) | 1 vCPU, 2 GB RAM — menjalankan pangkalan data, API, laman web dan terowong | $13.80 | RM 64.86 |
 | Log Masuk OTP | Telegram Bot API | $0.00 | RM 0.00 |
 | Sijil SSL / HTTPS | Cloudflare Tunnel | $0.00 | RM 0.00 |
 | Sandaran Luar Tapak | Cloudflare R2 (10 GB percuma) | $0.00 | RM 0.00 |
 | Lesen Perisian | Sumber terbuka | $0.00 | RM 0.00 |
-| **JUMLAH KOS BULANAN** | | **$12.00** | **RM 56.40** |
-
-> **Pilihan penjimatan:** Pelayan 1 vCPU, 1 GB RAM berharga **$6.00/bulan (RM 28.20)**.
-> Walau bagaimanapun, spesifikasi 2 GB disyorkan bagi memastikan prestasi stabil.
-
+| **JUMLAH KOS BULANAN** | | **$13.80** | **RM 64.86** |
 ### 4.3 Unjuran Kos Tahunan
 
 | Item | Kos Bulanan (RM) | Kos Tahunan (RM) |
 |---|---|---|
-| Kos Infrastruktur | RM 56.40 | RM 676.80 |
+| Kos Infrastruktur | RM 64.86 | RM 778.32 |
 | Hadiah Bulanan (7 pemenang × 12 bulan) | RM 200.00 | RM 2,400.00 |
 | Hadiah Mega Tahunan (3 pemenang) | — | RM 1,000.00 |
-| **JUMLAH KESELURUHAN** | | **RM 4,076.80** |
+| **JUMLAH KESELURUHAN** | | **RM 4,178.32** |
 
 ### 4.4 Ringkasan Kos
 
 | Kategori | Kos Tahunan (RM) | Peratusan |
 |---|---|---|
-| Infrastruktur Teknologi | RM 676.80 | 16.6% |
-| Hadiah dan Insentif | RM 3,400.00 | 83.4% |
-| **JUMLAH** | **RM 4,076.80** | **100%** |
+| Infrastruktur Teknologi | RM 778.32 | 18.6% |
+| Hadiah dan Insentif | RM 3,400.00 | 81.4% |
+| **JUMLAH** | **RM 4,178.32** | **100%** |
 
-> **Perhatian:** Kos infrastruktur teknologi hanyalah **RM 56.40 sebulan** — bersamaan
-> **kurang daripada RM 2 sehari**. Ini merupakan pelaburan yang sangat berbaloi berbanding
-> faedah jangka panjang dalam pembangunan belia surau.
+> **Perhatian:** Kos infrastruktur teknologi hanyalah **RM 64.86 sebulan** bersamaan **lebih kurang RM 2.16 sehari**. Ini merupakan pelaburan yang sangat
+> berbaloi berbanding faedah jangka panjang dalam pembangunan anak remaja surau.
 
 ---
 
@@ -227,12 +247,12 @@ yang lebih kecil:
 - Data kehadiran dan penyertaan yang tepat dan masa nyata
 - Penjimatan masa dalam proses merekod dan pengiraan
 - Asas objektif untuk pemberian hadiah dan pengiktirafan
-- Kemudahan pemantauan prestasi program belia
+- Kemudahan pemantauan prestasi program anak remaja
 
 ### 6.3 Faedah kepada Surau
 
-- Peningkatan kehadiran solat berjemaah dalam kalangan belia
-- Pengukuhan peranan surau sebagai pusat pembangunan belia
+- Peningkatan kehadiran solat berjemaah dalam kalangan anak remaja
+- Pengukuhan peranan surau sebagai pusat pembangunan anak remaja
 - Data statistik untuk perancangan program masa hadapan
 
 ---
@@ -254,8 +274,8 @@ yang lebih kecil:
 AJK Surau Al-Abqori dipohon mempertimbangkan dan memutuskan perkara berikut:
 
 1. **MELULUSKAN** perlaksanaan sistem aplikasi web Pemuda Surau Al-Abqori.
-2. **MELULUSKAN** peruntukan kos infrastruktur sebanyak **RM 676.80 setahun**
-   (RM 56.40 sebulan).
+2. **MELULUSKAN** peruntukan kos infrastruktur sebanyak **RM 778.32 setahun**
+   (RM 64.86 sebulan).
 3. **MELULUSKAN** peruntukan hadiah bulanan sebanyak **RM 200.00 sebulan**
    (RM 2,400.00 setahun) bagi 7 pemenang teratas.
 4. **MELULUSKAN** peruntukan hadiah mega tahunan sebanyak **RM 1,000.00** bagi
@@ -264,15 +284,15 @@ AJK Surau Al-Abqori dipohon mempertimbangkan dan memutuskan perkara berikut:
    dan pemberian hadiah.
 6. **MENETAPKAN** tarikh pelancaran rasmi dan majlis penyampaian hadiah tahunan.
 
-**Jumlah peruntukan keseluruhan yang dicadangkan: RM 4,076.80 setahun.**
+**Jumlah peruntukan keseluruhan yang dicadangkan: RM 4,178.32 setahun.**
 
 ---
 
 ## 9.0 PENUTUP
 
 Sistem aplikasi web Pemuda Surau Al-Abqori merupakan satu inisiatif yang mampu
-mentransformasi cara surau mengiktiraf dan menggalakkan penyertaan golongan belia. Dengan
-kos infrastruktur yang sangat rendah — **kurang daripada RM 2 sehari** — sistem ini
+mentransformasi cara surau mengiktiraf dan menggalakkan penyertaan golongan anak remaja. Dengan
+kos infrastruktur yang sangat rendah — **lebih kurang RM 2 sehari** — sistem ini
 menawarkan pulangan yang besar dalam bentuk peningkatan kehadiran solat berjemaah,
 pembacaan Al-Quran dan amal kebajikan.
 
@@ -284,42 +304,19 @@ Sekian, terima kasih.
 
 **Disediakan oleh:**
 
-_________________________
-Nama:
+Nama: Muhd Imran bin Muhd Fadhil
 
 
-Jawatan:
+Jawatan: Wakil Pemuda
 
 
-Tarikh:
-
+Tarikh: 20 September 2026
 
 
 
 
 
 
-**Disemak oleh:**
-
-_________________________
-Nama:
-
-
-Jawatan:
-
-
-Tarikh:
-
-**Diluluskan oleh:**
-
-_________________________
-Nama:
-
-
-Jawatan:
-
-
-Tarikh:
 
 ---
 

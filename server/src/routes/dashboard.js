@@ -200,12 +200,11 @@ router.get(
          SELECT a.user_id,
                 COUNT(*)::int AS attendance,
                 COUNT(DISTINCT a.attendance_date)::int AS days_attended,
-                -- Points, not raw counts: Subuh 15, Isyak 10, the rest 5.
+                -- Points, not raw counts: Subuh 10, the rest 5.
                 -- These numbers mirror server/src/utils/scoring.js and cannot be
                 -- bound as parameters inside a CASE expression.
                 COALESCE(SUM(CASE a.prayer
-                  WHEN 'subuh'   THEN 15
-                  WHEN 'isyak'   THEN 10
+                  WHEN 'subuh'   THEN 10
                   ELSE 5
                 END), 0)::int AS attendance_points
          FROM attendance a, period p
@@ -282,8 +281,7 @@ router.get(
          SELECT COUNT(*)::int AS attendance,
                 COUNT(DISTINCT attendance_date)::int AS days_attended,
                 COALESCE(SUM(CASE prayer
-                  WHEN 'subuh' THEN 15
-                  WHEN 'isyak' THEN 10
+                  WHEN 'subuh' THEN 10
                   ELSE 5
                 END), 0)::int AS attendance_points
          FROM attendance WHERE user_id = $1

@@ -32,11 +32,11 @@ export const PRAYER_LABELS = Object.fromEntries(PRAYERS.map((p) => [p.key, p.lab
 
 /** Points per prayer check-in. Subuh is hardest, so it is worth the most. */
 export const PRAYER_POINTS = {
-  subuh: 15,
+  subuh: 10,
   zuhur: 5,
   asar: 5,
   maghrib: 5,
-  isyak: 10,
+  isyak: 5,
 };
 
 /** Points for each Quran activity (recitation or memorization). */

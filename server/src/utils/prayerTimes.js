@@ -97,12 +97,14 @@ export async function getPrayerTimes(dateStr) {
  */
 export async function getPrayerWindows(dateStr) {
   const times = await getPrayerTimes(dateStr);
-  const { beforeMinutes, afterMinutes } = config.prayer;
+  const { beforeMinutes, afterMinutes, beforeMinutesByPrayer } = config.prayer;
   const windows = {};
   for (const [key, adhan] of Object.entries(times)) {
+    // Some prayers (e.g. Isyak) open at the adhan instead of before it.
+    const before = beforeMinutesByPrayer?.[key] ?? beforeMinutes;
     windows[key] = {
       adhan,
-      start: new Date(adhan.getTime() - beforeMinutes * 60 * 1000),
+      start: new Date(adhan.getTime() - before * 60 * 1000),
       end: new Date(adhan.getTime() + afterMinutes * 60 * 1000),
     };
   }

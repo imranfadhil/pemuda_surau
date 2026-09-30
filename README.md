@@ -35,14 +35,13 @@ counts are still shown alongside (e.g. "12 prayers", "3 recitations").
 
 | Activity | Points |
 | --- | --- |
-| Prayer check-in — Subuh | **15** |
-| Prayer check-in — Isyak | **10** |
-| Prayer check-in — Zuhur / Asar / Maghrib | **5** |
+| Prayer check-in — Subuh | **10** |
+| Prayer check-in — Zuhur / Asar / Maghrib / Isyak | **5** |
 | Quran activity (recitation or memorization) | **5** |
 | Merit award | **1–10** (chosen by the teacher/AJK) |
 
-Subuh is worth the most because it is the hardest to attend, and Isyak more than the daytime
-prayers for the same reason. **Overall** is the sum of points across every category.
+Subuh is worth the most because it is the hardest to attend. **Overall** is the sum of points
+across every category.
 
 The rules live in `server/src/utils/scoring.js` and are mirrored in
 `web/src/lib/constants.js` for display. The leaderboard SQL in `routes/dashboard.js`
