@@ -10,16 +10,17 @@ import { can, formatDate } from '../lib/constants.js';
 /**
  * Quran activity page.
  *
- * - Members log their own recitation/memorization.
- * - Teachers (and admins) can record on a member's behalf. They must be at the
- *   surau (geofence), but may select the member manually - a face scan is
- *   optional, so a whole class can be recorded swiftly. The record stores who
- *   submitted it.
+ * - Members log their own recitation/memorization at the surau (geofenced).
+ * - Teachers (and admins) can record on a member's behalf from ANYWHERE — no
+ *   geofence and no hourly cooldown — so a whole class can be recorded after
+ *   the session. A face scan is optional there; when one is taken it is still
+ *   verified. The record stores who submitted it.
  */
 export default function QuranPage() {
   const { user } = useAuth();
   const canManage = can(user, 'manageQuran');
   const canIdentify = can(user, 'identifyMembers');
+  const canLogOffsite = can(user, 'logQuranOffsite');
 
   const [mine, setMine] = useState({ recitation: 0, memorization: 0, logs: [] });
   const [members, setMembers] = useState([]);
@@ -67,6 +68,9 @@ export default function QuranPage() {
   }, []);
 
   const recordingForOther = canManage && form.userId && form.userId !== user?.id;
+  // Staff recording for another member may do so from anywhere; the server
+  // skips the geofence and the cooldown for them, so don't ask for a location.
+  const offsite = recordingForOther && canLogOffsite;
 
   async function submit(e) {
     e.preventDefault();
@@ -74,11 +78,12 @@ export default function QuranPage() {
     setNotice('');
     setBusy(true);
     try {
-      // Every Quran log must be recorded at the surau (the server enforces the
-      // geofence). Reuse the scanned location when we have it, otherwise fetch
-      // it now.
+      // Self-logging (and a guardian logging for their own child) must happen at
+      // the surau, so the server enforces the geofence. Reuse the scanned
+      // location when we have it, otherwise fetch it now. Staff recording for
+      // another member are exempt, so no location is needed.
       let location = proof;
-      if (!location) {
+      if (!location && !offsite) {
         setNotice('Getting location…');
         const pos = await getPosition();
         location = { latitude: pos.latitude, longitude: pos.longitude, accuracy: pos.accuracy };
@@ -175,7 +180,9 @@ export default function QuranPage() {
           : 'Log your recitation and memorization to earn badges.'}
       </p>
       <p className="muted" style={{ marginTop: -8 }}>
-        📍 Must be at the surau · one log per hour per member.
+        {canLogOffsite
+          ? '📍 Members must be at the surau · teachers may record for a member from anywhere.'
+          : '📍 Must be at the surau · one log per hour per member.'}
       </p>
 
       {error && <div className="alert alert-error">{error}</div>}
@@ -202,8 +209,8 @@ export default function QuranPage() {
         {canManage && (
           <>
             <p className="muted" style={{ marginBottom: 12 }}>
-              Select the member, then record their activity. You must be at the surau.
-              Scanning a face is optional.
+              Select the member, then record their activity. You can do this from anywhere —
+              no location needed. Scanning a face is optional.
             </p>
             {canIdentify && (
               <button
@@ -299,8 +306,10 @@ export default function QuranPage() {
 
         {recordingForOther && !proof && (
           <div className="alert alert-info">
-            Recording for <strong>{selectedName}</strong>. Your location will be checked
-            to confirm you are at the surau.
+            Recording for <strong>{selectedName}</strong>.{' '}
+            {offsite
+              ? 'No location needed — you can record this from anywhere.'
+              : 'Your location will be checked to confirm you are at the surau.'}
           </div>
         )}
 

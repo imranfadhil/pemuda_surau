@@ -955,18 +955,23 @@ paths:
       tags: [Activity]
       summary: Log Quran activity
       description: |
-        Every log must be recorded at the surau (geofence). At most one log per
-        member per cooldown window (default 60 minutes) — a 429 is returned with
-        `retryAfterMinutes`. Teachers/admins may log for any member (a matching
-        face descriptor is then required); members may log for themselves or a
-        dependent.
+        At most one log per member per cooldown window (default 60 minutes) — a
+        429 is returned with `retryAfterMinutes`.
+
+        Members may log for themselves or a dependent; both must be at the surau
+        (geofence) and are rate-limited by the cooldown.
+
+        Teachers/admins (`logQuranOffsite`) may log for ANY member from anywhere:
+        the geofence and the cooldown are both skipped, so a whole class can be
+        recorded after the session. A face descriptor is optional there, but when
+        supplied it must match the selected member.
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
-              required: [kind, latitude, longitude]
+              required: [kind]
               properties:
                 kind: { type: string, enum: [recitation, memorization] }
                 surah: { type: string, nullable: true }
@@ -975,8 +980,14 @@ paths:
                 note: { type: string, nullable: true }
                 forUserId: { type: string, format: uuid, nullable: true }
                 descriptor: { $ref: '#/components/schemas/Descriptor' }
-                latitude: { type: number }
-                longitude: { type: number }
+                latitude:
+                  type: number
+                  nullable: true
+                  description: Required unless the caller holds `logQuranOffsite`.
+                longitude:
+                  type: number
+                  nullable: true
+                  description: Required unless the caller holds `logQuranOffsite`.
       responses:
         '201': { description: Logged }
         '403': { $ref: '#/components/responses/Forbidden' }

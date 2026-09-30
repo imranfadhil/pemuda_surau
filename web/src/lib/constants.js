@@ -63,6 +63,7 @@ export const ROLE_CAPABILITIES = {
     'managePrograms',
     'manageMerits',
     'manageQuran',
+    'logQuranOffsite',
     'manageAttendance',
     'manageDependents',
     'viewMembers',
@@ -70,7 +71,14 @@ export const ROLE_CAPABILITIES = {
     'checkIn',
   ],
   parent: ['manageDependents', 'checkIn'],
-  teacher: ['manageQuran', 'manageMerits', 'viewMembers', 'identifyMembers', 'checkIn'],
+  teacher: [
+    'manageQuran',
+    'logQuranOffsite',
+    'manageMerits',
+    'viewMembers',
+    'identifyMembers',
+    'checkIn',
+  ],
   ajk: ['manageMerits', 'viewMembers', 'identifyMembers', 'checkIn'],
   // Every member may manage their OWN dependents (children) — see roles.js.
   youth: ['manageDependents', 'checkIn'],

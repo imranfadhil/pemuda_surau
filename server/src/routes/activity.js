@@ -281,11 +281,16 @@ router.get(
 /**
  * Log a Quran activity.
  *
- * - Self-logging (or a guardian logging for their own dependent) needs no face.
- * - Staff recording for another member must be at the surau (geofence), but the
- *   face scan is OPTIONAL: teachers often record a whole class in one sitting,
- *   so they can select the member manually to move swiftly. When a scan is
- *   supplied it is still verified, so a mismatch is caught.
+ * - Self-logging (or a guardian logging for their own dependent) needs no face,
+ *   but MUST happen at the surau (geofence) and is rate-limited by the cooldown.
+ * - Teachers/admins recording for ANOTHER member are exempt from both: they
+ *   often record a whole class from home or the office after the session, and
+ *   the cooldown would block a second student in the same hour. The face scan
+ *   is optional there too (select the member manually to move swiftly); when a
+ *   scan IS supplied it is still verified, so a mismatch is caught.
+ *
+ * The exemption is keyed on the `logQuranOffsite` capability, so it can be
+ * granted or revoked per role without touching this handler.
  */
 router.post(
   '/quran',
@@ -298,30 +303,40 @@ router.post(
 
     const targetUserId = await resolveQuranTarget(req.user, forUserId);
 
-    // Every Quran log must happen at the surau - whether a teacher is recording
-    // for a member or a member is logging their own recitation.
-    assertWithinGeofence(latitude, longitude, accuracy);
+    // Staff recording for someone else may do so from anywhere, without the
+    // per-member cooldown. Everyone else (self, or a guardian logging for their
+    // own child) is still geofenced and rate-limited.
+    const offsite =
+      targetUserId !== req.user.sub && roleHasCapability(req.user.role, 'logQuranOffsite');
 
-    // Rate limit: at most one log per member per cooldown window, so a member
-    // can't inflate their score with rapid repeat submissions.
-    const cooldown = config.quran.cooldownMinutes;
-    if (cooldown > 0) {
-      const { rows: recent } = await query(
-        `SELECT logged_at FROM quran_logs
-         WHERE user_id = $1 AND logged_at > now() - ($2 || ' minutes')::interval
-         ORDER BY logged_at DESC LIMIT 1`,
-        [targetUserId, String(cooldown)],
-      );
-      if (recent[0]) {
-        const elapsedMin = Math.floor((Date.now() - new Date(recent[0].logged_at).getTime()) / 60000);
-        const waitMin = Math.max(1, cooldown - elapsedMin);
-        const err = httpError(
-          429,
-          `Already logged in the last ${cooldown} minutes. Please try again in about ${waitMin} minute(s).`,
+    if (!offsite) {
+      // Every Quran log must happen at the surau - whether a teacher is
+      // recording for a member or a member is logging their own recitation.
+      assertWithinGeofence(latitude, longitude, accuracy);
+
+      // Rate limit: at most one log per member per cooldown window, so a member
+      // can't inflate their score with rapid repeat submissions.
+      const cooldown = config.quran.cooldownMinutes;
+      if (cooldown > 0) {
+        const { rows: recent } = await query(
+          `SELECT logged_at FROM quran_logs
+           WHERE user_id = $1 AND logged_at > now() - ($2 || ' minutes')::interval
+           ORDER BY logged_at DESC LIMIT 1`,
+          [targetUserId, String(cooldown)],
         );
-        err.code = 'QURAN_COOLDOWN';
-        err.retryAfterMinutes = waitMin;
-        throw err;
+        if (recent[0]) {
+          const elapsedMin = Math.floor(
+            (Date.now() - new Date(recent[0].logged_at).getTime()) / 60000,
+          );
+          const waitMin = Math.max(1, cooldown - elapsedMin);
+          const err = httpError(
+            429,
+            `Already logged in the last ${cooldown} minutes. Please try again in about ${waitMin} minute(s).`,
+          );
+          err.code = 'QURAN_COOLDOWN';
+          err.retryAfterMinutes = waitMin;
+          throw err;
+        }
       }
     }
 

@@ -5,6 +5,8 @@
  *   admin   - full access
  *   parent  - manage children + prayer check-in
  *   teacher - prayer check-in + Quran (recitation/memorization) + merits
+ *             (may also record Quran for members from anywhere - see
+ *             `logQuranOffsite`)
  *   ajk     - prayer check-in + merits
  *   youth   - basic member (prayer check-in only)
  *
@@ -29,6 +31,7 @@ export const CAPABILITIES = {
     'managePrograms',
     'manageMerits',
     'manageQuran',
+    'logQuranOffsite',
     'manageAttendance',
     'manageDependents',
     'viewMembers',
@@ -36,7 +39,14 @@ export const CAPABILITIES = {
     'checkIn',
   ],
   parent: ['manageDependents', 'checkIn'],
-  teacher: ['manageQuran', 'manageMerits', 'viewMembers', 'identifyMembers', 'checkIn'],
+  teacher: [
+    'manageQuran',
+    'logQuranOffsite',
+    'manageMerits',
+    'viewMembers',
+    'identifyMembers',
+    'checkIn',
+  ],
   ajk: ['manageMerits', 'viewMembers', 'identifyMembers', 'checkIn'],
   // Every member may manage their OWN dependents (children). The dependents
   // routes are scoped to the caller, so this is not a privilege escalation —

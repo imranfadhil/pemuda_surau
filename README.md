@@ -336,6 +336,22 @@ dev mode is unaffected.
   `no-cache` so app updates are picked up.
 - If you change the app shell, bump `CACHE` in `sw.js` to evict the old entries.
 
+## Quran logging rules
+
+| Who | Geofence | Cooldown | Face scan |
+| --- | --- | --- | --- |
+| Member logging their own recitation | ✅ must be at the surau | ✅ 1 per hour | not needed |
+| Parent logging for their own child | ✅ must be at the surau | ✅ 1 per hour | not needed |
+| **Teacher / admin logging for another member** | ❌ anywhere | ❌ none | optional (verified when supplied) |
+
+The teacher exemption is the `logQuranOffsite` capability (held by `teacher` and `admin`),
+so a teacher can record a whole class after the session — from home or the office — without
+the hourly limit blocking a second student. It is granted per role in
+`server/src/utils/roles.js`; revoke it there to require teachers to be at the surau again.
+
+Every log still records **who submitted it** (`logged_by`), which the UI shows as
+"Recorded by …", so an offsite entry is always attributable.
+
 ## Deploying to DigitalOcean (Droplet + Docker Compose)
 
 ### 1. Create a Droplet
@@ -497,8 +513,7 @@ Auth column: **–** = public, **user** = any logged-in member, **cap** = requir
 | GET/POST | `/api/activity/merits` | cap `manageMerits` | List / award merits |
 | DELETE | `/api/activity/merits/:id` | cap `manageMerits` | Revoke a merit |
 | GET | `/api/activity/quran/me` | user | My Quran logs |
-| GET/POST | `/api/activity/quran` | cap `manageQuran` (list) / user (log) | List / log Quran activity |
-| PUT/DELETE | `/api/activity/quran/:id` | user | Edit / delete a Quran log |
+| GET/POST | `/api/activity/quran` | cap `manageQuran` (list) / user (log) | List / log Quran activity || PUT/DELETE | `/api/activity/quran/:id` | user | Edit / delete a Quran log |
 | GET | `/api/dashboard/stats` | – | Overall stats |
 | GET | `/api/dashboard/weekly` | – | Weekly activity (last 7 days) |
 | GET | `/api/dashboard/leaderboard` | – | Rankings (`?period=month\|year\|all&category=…`) |
