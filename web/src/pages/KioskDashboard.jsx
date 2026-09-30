@@ -8,6 +8,7 @@ import { api } from '../lib/api.js';
 import { CATEGORIES, badgeFor, SURAU, COMMUNITY } from '../lib/constants.js';
 import { duplicateNameKeys, disambiguatorFor } from '../lib/members.js';
 import { useIsMobile } from '../lib/device.js';
+import InstallPrompt from '../components/InstallPrompt.jsx';
 
 // How long each leaderboard category stays on screen before rotating.
 const ROTATE_MS = 12000;
@@ -226,6 +227,8 @@ function MobileDashboard({ stats, weeklyChart, monthly, yearly, category, catInd
           💬 Join the {COMMUNITY.label}
         </a>
       </div>
+
+      <InstallPrompt variant="card" />
     </div>
   );
 }

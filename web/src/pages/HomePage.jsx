@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { api } from '../lib/api.js';
 import { useAuth } from '../lib/auth.jsx';
 import CommunityLink from '../components/CommunityLink.jsx';
+import InstallPrompt from '../components/InstallPrompt.jsx';
 import QuranLogDetails from '../components/QuranLogDetails.jsx';
 import { PRAYERS, PRAYER_LABELS, SURAU } from '../lib/constants.js';
 
@@ -65,6 +66,8 @@ export default function HomePage() {
       </div>
 
       <CommunityLink variant="card" />
+
+      <InstallPrompt variant="card" />
 
       {!user?.hasFace && (
         <div className="alert alert-info">

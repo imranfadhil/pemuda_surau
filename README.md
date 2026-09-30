@@ -24,7 +24,9 @@ statistics, rankings, and program management.
 - 📅 **Programs** — upcoming activities with join/leave
 - ⚙️ **Admin panel** — manage members, view daily attendance, manual check-in
 - 🔒 **HTTPS via Cloudflare Tunnel** — no open inbound ports, no certificate management
-- 🐳 **Docker Compose** — one command deploy to a DigitalOcean Droplet with persistent Postgres
+- � **Installable app (PWA)** — members can add it to their phone's home screen and open it
+  full-screen like a native app, with an offline app shell
+- �🐳 **Docker Compose** — one command deploy to a DigitalOcean Droplet with persistent Postgres
 
 ## Scoring
 
@@ -299,6 +301,40 @@ guardians (the primary guardian plus one co-guardian).
 
 Set `OTP_CHANNEL=sms` and configure `SMS_PROVIDER` with your Twilio or Vonage credentials.
 SMS to Malaysia is billed per message, so Telegram is recommended for regular use.
+
+## Install as an app (PWA)
+
+The web app is a Progressive Web App, so members can install it on their phone and open it
+full-screen from a home-screen icon — no app store, no build, no cost.
+
+**How members install it**
+
+- **Android (Chrome/Edge):** an **📲 Install** button appears in the top bar, and an
+  "Install the app" card appears on the Home page and the public landing page. Tapping either
+  opens the browser's native install dialog.
+- **iPhone/iPad (Safari):** iOS has no install API, so the card shows the manual steps —
+  **Share ⬆️ → Add to Home Screen ➕ → Add**.
+- The prompt hides itself once the app is installed, or if the member dismisses it.
+
+**What's included**
+
+| File | Purpose |
+| --- | --- |
+| `web/public/manifest.webmanifest` | App name, icons, `standalone` display, `start_url: /home`, shortcuts |
+| `web/public/sw.js` | Service worker: network-first navigations + cached app shell, cache-first static assets, **never** caches `/api/*` |
+| `web/public/icon-192.png`, `icon-512.png`, `icon-512-maskable.png`, `apple-touch-icon.png` | Home-screen icons (generated from `logo.png` on the brand teal) |
+| `web/src/lib/pwa.js` | Service-worker registration + `useInstallPrompt()` hook |
+| `web/src/components/InstallPrompt.jsx` | The install card / top-bar button |
+
+**Notes**
+
+- Installation requires **HTTPS** (or `localhost`). The Cloudflare Tunnel already provides this.
+- The service worker is registered in production builds only (`import.meta.env.PROD`), so Vite
+dev mode is unaffected.
+- `/api/*` is deliberately excluded from the cache — attendance and scores must always be live.
+- `nginx.conf` serves the manifest as `application/manifest+json` and marks `sw.js`
+  `no-cache` so app updates are picked up.
+- If you change the app shell, bump `CACHE` in `sw.js` to evict the old entries.
 
 ## Deploying to DigitalOcean (Droplet + Docker Compose)
 
