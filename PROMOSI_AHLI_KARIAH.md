@@ -91,23 +91,19 @@ Yang paling penting — **tingkatkan ibadah kita bersama!**
 Rekod solat berjemaah, bacaan Al-Quran & amal kebajikan.
 Kumpul mata, naik papan pendahulu, menang hadiah!
 
-🏆 *Hadiah bulanan:* 7 pemenang teratas (RM20–RM50)
-🏆 *Hadiah mega tahunan:* RM500 + piala untuk johan!
+🏆 *Hadiah bulanan + hadiah mega tahunan* untuk dimenangi
 
 ✅ Percuma sepenuhnya
 ✅ Guna telefon sahaja, tiada aplikasi perlu dimuat turun
 ✅ Log masuk mudah dengan Telegram
 
 *Cara mula:*
-1. Buka pautan aplikasi
+1. Buka pautan aplikasi - https://amended-bloomberg-happening-plain.trycloudflare.com/
 2. Log masuk dengan nombor telefon (kod dihantar ke Telegram)
 3. Daftar wajah sekali sahaja
 4. Mula rekod solat anda di surau!
 
-Ibu bapa boleh daftar anak-anak juga! 👨‍👩‍👧
-
-👉 Sertai kumpulan WhatsApp kami:
-https://chat.whatsapp.com/IuGhkTOQ1q9DjxJV4cnFKr
+Jemput ibu bapa daftarkan anak-anak! 👨‍👩‍👧
 
 Jom mula hari ini — tingkatkan ibadah kita bersama! 🤲
 ```
