@@ -4,6 +4,7 @@ import { api } from '../lib/api.js';
 import { useAuth } from '../lib/auth.jsx';
 import DataTable from '../components/DataTable.jsx';
 import MemberPicker from '../components/MemberPicker.jsx';
+import ProgramsAdmin from '../components/ProgramsAdmin.jsx';
 import { duplicateNameKeys, nameKey } from '../lib/members.js';
 import {
   PRAYERS, PRAYER_LABELS, todayISO, formatDate, formatDateTime, ROLES, ROLE_LABELS, can,
@@ -19,6 +20,7 @@ export default function AdminPage() {
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
   const canAttendance = can(user, 'manageAttendance');
+  const canPrograms = can(user, 'managePrograms');
 
   const [tab, setTab] = useState(isAdmin ? 'members' : 'attendance');
   const [users, setUsers] = useState([]);
@@ -353,6 +355,11 @@ export default function AdminPage() {
             Manual check-in
           </button>
         )}
+        {canPrograms && (
+          <button className={`tab ${tab === 'programs' ? 'active' : ''}`} onClick={() => setTab('programs')}>
+            Programs
+          </button>
+        )}
       </div>
 
       {tab === 'members' && isAdmin && (
@@ -441,6 +448,8 @@ export default function AdminPage() {
           <button className="btn btn-block">Record check-in</button>
         </form>
       )}
+
+      {tab === 'programs' && canPrograms && <ProgramsAdmin />}
     </div>
   );
 }

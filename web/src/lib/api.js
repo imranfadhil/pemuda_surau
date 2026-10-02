@@ -99,9 +99,16 @@ export const api = {
   deleteQuran: (id) => request(`/activity/quran/${id}`, { method: 'DELETE' }),
 
   listPrograms: (includePast = false) => request(`/programs?includePast=${includePast}`),
+  getProgram: (id) => request(`/programs/${id}`),
   createProgram: (program) => request('/programs', { method: 'POST', body: program }),
   updateProgram: (id, program) => request(`/programs/${id}`, { method: 'PUT', body: program }),
   deleteProgram: (id) => request(`/programs/${id}`, { method: 'DELETE' }),
   joinProgram: (id) => request(`/programs/${id}/join`, { method: 'POST' }),
   leaveProgram: (id) => request(`/programs/${id}/join`, { method: 'DELETE' }),
+  checkInProgram: (id, payload) => request(`/programs/${id}/check-in`, { method: 'POST', body: payload }),
+  programAttendance: (id) => request(`/programs/${id}/attendance`),
+  manualProgramCheckIn: (id, userId) =>
+    request(`/programs/${id}/attendance/manual`, { method: 'POST', body: { userId } }),
+  undoProgramCheckIn: (id, userId) =>
+    request(`/programs/${id}/attendance/${userId}`, { method: 'DELETE' }),
 };

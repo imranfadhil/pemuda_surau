@@ -26,6 +26,7 @@ function BottomNav() {
         { to: '/', label: 'Dashboard', icon: '🏆' },
         { to: '/home', label: 'Home', icon: '🏠' },
         { to: '/check-in', label: 'Check-in', icon: '🕌' },
+        { to: '/programs', label: 'Programs', icon: '📅' },
         { to: '/quran', label: 'Quran', icon: '📖' },
         { to: '/merits', label: 'Merits', icon: '🏅' },
         { to: '/profile', label: 'Profile', icon: '👤' },
@@ -38,7 +39,7 @@ function BottomNav() {
     items.push({ to: '/admin', label: 'Admin', icon: '⚙️' });
   }
 
-  // Admins get 7 items, which overflows a phone's width. Keep the active item
+  // Admins get 8 items, which overflows a phone's width. Keep the active item
   // scrolled into view so it is always visible (e.g. Admin when on /admin).
   useEffect(() => {
     const active = navRef.current?.querySelector('a.active');

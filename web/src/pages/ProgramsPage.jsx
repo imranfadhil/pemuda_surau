@@ -1,66 +1,129 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { api } from '../lib/api.js';
 import { useAuth } from '../lib/auth.jsx';
 import { formatDateTime, can } from '../lib/constants.js';
+import ProgramCheckIn from '../components/ProgramCheckIn.jsx';
 
-function ProgramCard({ program, isAdmin, onChanged }) {
+/** "in 2h 15m" / "started 10m ago" — a quick sense of how far off a program is. */
+function relativeTo(iso, now) {
+  const diff = new Date(iso).getTime() - now;
+  const abs = Math.abs(diff);
+  const totalMin = Math.floor(abs / 60000);
+  const h = Math.floor(totalMin / 60);
+  const m = totalMin % 60;
+  const span = h > 0 ? `${h}h ${m}m` : `${m}m`;
+  return diff >= 0 ? `in ${span}` : `${span} ago`;
+}
+
+function ProgramCard({ program, now, onChanged }) {
   const [busy, setBusy] = useState(false);
-  const start = new Date(program.starts_at);
-  const isPast = start < new Date();
+  const [error, setError] = useState('');
+  const [checkingIn, setCheckingIn] = useState(false);
+  const [result, setResult] = useState(null);
 
-  async function togglePublish() {
+  const start = new Date(program.starts_at);
+  const isPast = new Date(program.check_in_closes_at) < new Date(now);
+  const hasEnded = program.ends_at ? new Date(program.ends_at) < new Date(now) : false;
+
+  async function toggleJoin() {
     setBusy(true);
+    setError('');
     try {
-      await api.updateProgram(program.id, { isPublished: !program.is_published });
+      if (program.joined) await api.leaveProgram(program.id);
+      else await api.joinProgram(program.id);
       onChanged();
+    } catch (err) {
+      setError(err.message);
     } finally {
       setBusy(false);
     }
   }
 
-  async function remove() {
-    if (!confirm(`Delete "${program.title}"?`)) return;
-    setBusy(true);
-    try {
-      await api.deleteProgram(program.id);
-      onChanged();
-    } finally {
-      setBusy(false);
-    }
+  if (checkingIn) {
+    return (
+      <ProgramCheckIn
+        program={program}
+        onCancel={() => setCheckingIn(false)}
+        onDone={(res) => {
+          setCheckingIn(false);
+          setResult(res);
+          onChanged();
+        }}
+      />
+    );
   }
 
   return (
     <div className="card">
       <div className="program-card">
-        <div className="program-date" style={isPast ? { background: 'var(--slate-400)' } : undefined}>
+        <div
+          className="program-date"
+          style={isPast ? { background: 'var(--slate-400)' } : undefined}
+        >
           <div className="day">{start.getDate()}</div>
           <div className="mon">{start.toLocaleDateString(undefined, { month: 'short' })}</div>
         </div>
         <div style={{ flex: 1 }}>
           <div className="row-between">
             <strong>{program.title}</strong>
-            {!program.is_published && <span className="pill warn">Draft</span>}
+            <div className="row" style={{ gap: 6 }}>
+              {program.is_open && <span className="pill">Check-in open</span>}
+              {program.checked_in_at && <span className="pill">✓ Attended</span>}
+              {program.joined && !program.checked_in_at && <span className="pill">Going</span>}
+            </div>
           </div>
+
           <div className="muted" style={{ margin: '4px 0' }}>
             {formatDateTime(program.starts_at)}
+            {program.ends_at ? ` – ${formatDateTime(program.ends_at)}` : ''}
             {program.location ? ` · ${program.location}` : ''}
           </div>
+
+          {!isPast && (
+            <div className="muted" style={{ fontSize: '0.78rem' }}>
+              Starts {relativeTo(program.starts_at, now)}
+            </div>
+          )}
+
           {program.description && (
             <p style={{ margin: '6px 0', fontSize: '0.9rem' }}>{program.description}</p>
           )}
+
           <div className="muted" style={{ fontSize: '0.78rem' }}>
-            {program.join_count} joined
+            {program.join_count} going · {program.checked_in_count} attended
           </div>
-          {isAdmin && (
-            <div className="row" style={{ marginTop: 10 }}>
-              <button className="btn btn-sm btn-secondary" disabled={busy} onClick={togglePublish}>
-                {program.is_published ? 'Unpublish' : 'Publish'}
-              </button>
-              <button className="btn btn-sm btn-danger" disabled={busy} onClick={remove}>
-                Delete
-              </button>
+
+          {error && <div className="alert alert-error" style={{ marginTop: 10 }}>{error}</div>}
+          {result && (
+            <div className="alert alert-success" style={{ marginTop: 10 }}>
+              Checked in to <strong>{program.title}</strong>! Confidence{' '}
+              {(result.confidence * 100).toFixed(1)}%
             </div>
           )}
+
+          <div className="row" style={{ marginTop: 10, flexWrap: 'wrap' }}>
+            {!isPast && (
+              <button className="btn btn-sm btn-secondary" disabled={busy} onClick={toggleJoin}>
+                {program.joined ? 'Not going' : "I'm going"}
+              </button>
+            )}
+            {program.is_open && program.check_in_enabled && !program.checked_in_at && (
+              <button className="btn btn-sm" onClick={() => setCheckingIn(true)}>
+                Check in
+              </button>
+            )}
+            {program.checked_in_at && (
+              <span className="muted" style={{ fontSize: '0.78rem' }}>
+                Checked in {formatDateTime(program.checked_in_at)}
+              </span>
+            )}
+            {!program.is_open && !hasEnded && program.check_in_enabled && (
+              <span className="muted" style={{ fontSize: '0.78rem' }}>
+                Check-in opens {formatDateTime(program.check_in_opens_at)}
+              </span>
+            )}
+          </div>
         </div>
       </div>
     </div>
@@ -73,16 +136,8 @@ export default function ProgramsPage() {
   const [programs, setPrograms] = useState([]);
   const [includePast, setIncludePast] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [showForm, setShowForm] = useState(false);
   const [error, setError] = useState('');
-  const [form, setForm] = useState({
-    title: '',
-    description: '',
-    location: '',
-    startsAt: '',
-    endsAt: '',
-    category: 'program',
-  });
+  const [now, setNow] = useState(Date.now());
 
   function load() {
     setLoading(true);
@@ -95,94 +150,48 @@ export default function ProgramsPage() {
 
   useEffect(load, [includePast]);
 
-  async function create(e) {
-    e.preventDefault();
-    setError('');
-    try {
-      await api.createProgram({
-        title: form.title,
-        description: form.description || null,
-        location: form.location || null,
-        startsAt: new Date(form.startsAt).toISOString(),
-        endsAt: form.endsAt ? new Date(form.endsAt).toISOString() : null,
-        category: form.category || 'program',
-      });
-      setForm({ title: '', description: '', location: '', startsAt: '', endsAt: '', category: 'program' });
-      setShowForm(false);
-      load();
-    } catch (err) {
-      setError(err.message);
-    }
-  }
+  // Keeps the "starts in…" labels and the check-in buttons honest without a
+  // full refetch.
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 30000);
+    return () => clearInterval(t);
+  }, []);
+
+  const openNow = programs.filter((p) => p.is_open && p.check_in_enabled && !p.checked_in_at);
 
   return (
     <div>
       <div className="row-between">
         <div>
           <h1 className="page-title">Programs</h1>
-          <p className="page-sub">Upcoming activities at the surau.</p>
+          <p className="page-sub">Activities at the surau — join and check in on arrival.</p>
         </div>
         {isAdmin && (
-          <button className="btn btn-sm" onClick={() => setShowForm((s) => !s)}>
-            {showForm ? 'Cancel' : '+ New'}
-          </button>
+          <Link className="btn btn-sm btn-secondary" to="/admin">
+            Manage
+          </Link>
         )}
       </div>
 
       {error && <div className="alert alert-error">{error}</div>}
 
-      {isAdmin && showForm && (
-        <form className="card" onSubmit={create}>
-          <h2 className="card-title">New program</h2>
-          <div className="field" style={{ marginTop: 12 }}>
-            <label>Title</label>
-            <input
-              value={form.title}
-              onChange={(e) => setForm({ ...form, title: e.target.value })}
-              required
-            />
-          </div>
-          <div className="field">
-            <label>Description</label>
-            <textarea
-              rows={3}
-              value={form.description}
-              onChange={(e) => setForm({ ...form, description: e.target.value })}
-            />
-          </div>
-          <div className="row">
-            <div className="field" style={{ flex: 1 }}>
-              <label>Starts at</label>
-              <input
-                type="datetime-local"
-                value={form.startsAt}
-                onChange={(e) => setForm({ ...form, startsAt: e.target.value })}
-                required
-              />
-            </div>
-            <div className="field" style={{ flex: 1 }}>
-              <label>Ends at</label>
-              <input
-                type="datetime-local"
-                value={form.endsAt}
-                onChange={(e) => setForm({ ...form, endsAt: e.target.value })}
-              />
-            </div>
-          </div>
-          <div className="field">
-            <label>Location</label>
-            <input
-              value={form.location}
-              onChange={(e) => setForm({ ...form, location: e.target.value })}
-            />
-          </div>
-          <button className="btn btn-block">Create program</button>
-        </form>
+      {!user?.hasFace && (
+        <div className="alert alert-info">
+          You haven't enrolled your face yet — you'll need it to check in.{' '}
+          <Link to="/register"><strong>Complete registration →</strong></Link>
+        </div>
+      )}
+
+      {openNow.length > 0 && (
+        <div className="alert alert-success">
+          <strong>{openNow.length}</strong> program{openNow.length > 1 ? 's are' : ' is'} open for
+          check-in right now.
+        </div>
       )}
 
       <div className="tab-row">
         <button className={`tab ${!includePast ? 'active' : ''}`} onClick={() => setIncludePast(false)}>
-          Upcoming
+          Current &amp; upcoming
         </button>
         <button className={`tab ${includePast ? 'active' : ''}`} onClick={() => setIncludePast(true)}>
           All
@@ -195,7 +204,7 @@ export default function ProgramsPage() {
         <div className="card center muted">No programs yet.</div>
       ) : (
         programs.map((p) => (
-          <ProgramCard key={p.id} program={p} isAdmin={isAdmin} onChanged={load} />
+          <ProgramCard key={p.id} program={p} now={now} onChanged={load} />
         ))
       )}
     </div>

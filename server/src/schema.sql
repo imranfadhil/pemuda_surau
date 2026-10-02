@@ -94,6 +94,40 @@ CREATE TABLE IF NOT EXISTS program_attendance (
   UNIQUE (program_id, user_id)
 );
 
+-- ---------------------------------------------------------------------------
+-- Program check-in: a member registers interest ("join"), then proves they
+-- actually turned up with a face scan inside the geofence. The two are
+-- deliberately separate columns so an admin can see who signed up but never
+-- arrived, and so a check-in is never implied by a join.
+-- ---------------------------------------------------------------------------
+ALTER TABLE program_attendance ADD COLUMN IF NOT EXISTS checked_in_at TIMESTAMPTZ;
+ALTER TABLE program_attendance ADD COLUMN IF NOT EXISTS face_score REAL;
+ALTER TABLE program_attendance ADD COLUMN IF NOT EXISTS latitude DOUBLE PRECISION;
+ALTER TABLE program_attendance ADD COLUMN IF NOT EXISTS longitude DOUBLE PRECISION;
+-- Who recorded the check-in when it was not the member themselves (staff
+-- scanning a youth's face, or an admin marking attendance manually).
+ALTER TABLE program_attendance ADD COLUMN IF NOT EXISTS verified_by UUID REFERENCES users(id) ON DELETE SET NULL;
+ALTER TABLE program_attendance ADD COLUMN IF NOT EXISTS method TEXT NOT NULL DEFAULT 'face'
+  CHECK (method IN ('face', 'manual'));
+
+CREATE INDEX IF NOT EXISTS idx_program_attendance_program
+  ON program_attendance (program_id, checked_in_at DESC);
+CREATE INDEX IF NOT EXISTS idx_program_attendance_user
+  ON program_attendance (user_id, joined_at DESC);
+
+-- A program may be held somewhere other than the surau (a camp, a field trip),
+-- so it can carry its own geofence. When these are NULL the surau's own
+-- coordinates and radius are used.
+ALTER TABLE programs ADD COLUMN IF NOT EXISTS latitude DOUBLE PRECISION;
+ALTER TABLE programs ADD COLUMN IF NOT EXISTS longitude DOUBLE PRECISION;
+ALTER TABLE programs ADD COLUMN IF NOT EXISTS radius_meters INT;
+-- How long after `ends_at` a check-in is still accepted. Programs often run
+-- over, and a member arriving at the tail end should not be turned away.
+ALTER TABLE programs ADD COLUMN IF NOT EXISTS check_in_grace_minutes INT NOT NULL DEFAULT 30;
+-- When false, members may only check in during the program window. Admins can
+-- still record attendance manually.
+ALTER TABLE programs ADD COLUMN IF NOT EXISTS check_in_enabled BOOLEAN NOT NULL DEFAULT TRUE;
+
 CREATE TABLE IF NOT EXISTS settings (
   key        TEXT PRIMARY KEY,
   value      JSONB NOT NULL,

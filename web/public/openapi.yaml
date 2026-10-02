@@ -150,11 +150,92 @@ components:
       type: object
       required: [title, startsAt]
       properties:
+        title: { type: string, maxLength: 160 }
+        description: { type: string, maxLength: 2000, nullable: true }
+        location: { type: string, maxLength: 200, nullable: true }
+        startsAt: { type: string, format: date-time }
+        endsAt: { type: string, format: date-time, nullable: true }
+        category: { type: string, maxLength: 60, nullable: true }
+        isPublished: { type: boolean, default: true }
+        latitude:
+          type: number
+          nullable: true
+          description: |
+            Optional venue latitude. When omitted (along with `longitude`) the
+            surau's own configured location is used as the check-in geofence.
+        longitude: { type: number, nullable: true }
+        radiusMeters:
+          type: integer
+          minimum: 10
+          maximum: 50000
+          nullable: true
+          description: Geofence radius for this program. Defaults to the surau radius.
+        checkInGraceMinutes:
+          type: integer
+          minimum: 0
+          maximum: 1440
+          default: 30
+          description: How long after the program ends check-in stays open.
+        checkInEnabled:
+          type: boolean
+          default: true
+          description: When false, members cannot self check-in; staff can still record manually.
+
+    Program:
+      type: object
+      description: |
+        A program as returned to the client. `is_open` reflects the check-in
+        window (opens at `starts_at`, closes at `ends_at` — or three hours after
+        the start when `ends_at` is null — plus `check_in_grace_minutes`).
+      properties:
+        id: { type: string, format: uuid }
         title: { type: string }
         description: { type: string, nullable: true }
         location: { type: string, nullable: true }
-        startsAt: { type: string, format: date-time }
-        endsAt: { type: string, format: date-time, nullable: true }
+        starts_at: { type: string, format: date-time }
+        ends_at: { type: string, format: date-time, nullable: true }
+        category: { type: string, nullable: true }
+        is_published: { type: boolean }
+        latitude: { type: number, nullable: true }
+        longitude: { type: number, nullable: true }
+        radius_meters: { type: integer, nullable: true }
+        check_in_grace_minutes: { type: integer }
+        check_in_enabled: { type: boolean }
+        created_by: { type: string, format: uuid, nullable: true }
+        created_by_name: { type: string, nullable: true }
+        created_at: { type: string, format: date-time }
+        joined:
+          type: boolean
+          description: Whether the calling user has joined (or checked in to) this program.
+        checked_in_at: { type: string, format: date-time, nullable: true }
+        is_open: { type: boolean }
+        check_in_opens_at: { type: string, format: date-time }
+        check_in_closes_at: { type: string, format: date-time }
+        join_count: { type: integer }
+        checked_in_count: { type: integer }
+
+    ProgramAttendance:
+      type: object
+      description: |
+        One roster row. `joinedAt` records interest and `checkedInAt` records
+        proven attendance, so a row with a join but no check-in is a no-show.
+      properties:
+        id: { type: string, format: uuid }
+        userId: { type: string, format: uuid }
+        fullName: { type: string }
+        phone: { type: string, nullable: true }
+        isDependent:
+          type: boolean
+          description: True when the member has a guardian on record.
+        guardianName: { type: string, nullable: true }
+        joinedAt: { type: string, format: date-time }
+        checkedInAt: { type: string, format: date-time, nullable: true }
+        method: { type: string, enum: [face, manual] }
+        faceScore: { type: number, nullable: true }
+        verifiedByName:
+          type: string
+          nullable: true
+          description: Staff member who recorded a manual check-in.
 
   parameters:
     Id:
@@ -1194,27 +1275,68 @@ paths:
     get:
       tags: [Programs]
       summary: List programs
+      description: |
+        Members see published programs only; staff holding `managePrograms` also
+        see drafts. Each program carries the caller's own `joined` and
+        `checked_in_at` state plus `is_open` for the check-in window.
       parameters:
         - name: includePast
           in: query
           schema: { type: boolean, default: false }
+          description: Include programs that have already finished.
       responses:
-        '200': { description: OK }
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  programs:
+                    type: array
+                    items: { $ref: '#/components/schemas/Program' }
     post:
       tags: [Programs]
-      summary: Create a program (admin)
+      summary: Create a program
+      x-capability: managePrograms
       requestBody:
         required: true
         content:
           application/json:
             schema: { $ref: '#/components/schemas/ProgramInput' }
       responses:
-        '201': { description: Created }
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  program: { $ref: '#/components/schemas/Program' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
 
   /programs/{id}:
+    get:
+      tags: [Programs]
+      summary: Get one program
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  program: { $ref: '#/components/schemas/Program' }
+        '404': { $ref: '#/components/responses/NotFound' }
     put:
       tags: [Programs]
-      summary: Update a program (admin)
+      summary: Update a program
+      description: Partial update — omitted fields keep their current value.
+      x-capability: managePrograms
       parameters:
         - $ref: '#/components/parameters/Id'
       requestBody:
@@ -1223,23 +1345,47 @@ paths:
           application/json:
             schema: { $ref: '#/components/schemas/ProgramInput' }
       responses:
-        '200': { description: Updated }
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  program: { $ref: '#/components/schemas/Program' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
     delete:
       tags: [Programs]
-      summary: Delete a program (admin)
+      summary: Delete a program
+      x-capability: managePrograms
       parameters:
         - $ref: '#/components/parameters/Id'
       responses:
-        '200': { description: Deleted }
+        '200':
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
 
   /programs/{id}/join:
     post:
       tags: [Programs]
       summary: Join a program
+      description: |
+        Records interest only. Joining is independent of check-in, so staff can
+        tell who signed up but never turned up.
       parameters:
         - $ref: '#/components/parameters/Id'
       responses:
         '200': { description: Joined }
+        '404': { $ref: '#/components/responses/NotFound' }
     delete:
       tags: [Programs]
       summary: Leave a program
@@ -1247,6 +1393,173 @@ paths:
         - $ref: '#/components/parameters/Id'
       responses:
         '200': { description: Left }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /programs/{id}/check-in:
+    post:
+      tags: [Programs]
+      summary: Face-verified program check-in
+      description: |
+        Check-in is only accepted while the program window is open: it opens at
+        `starts_at` and closes at `ends_at` (or three hours after the start when
+        `ends_at` is null) plus `check_in_grace_minutes`. A program with
+        `check_in_enabled: false` rejects member check-in entirely.
+
+        The device must be inside the program's geofence — the program's own
+        `latitude`/`longitude`/`radius_meters` when set, otherwise the surau's
+        configured location and radius.
+
+        `forUserId` selects who is being checked in:
+
+        - **omitted** — check yourself in;
+        - **a dependent** — a guardian checks in their own child;
+        - **any member** — staff holding the `identifyMembers` capability
+          (teacher, AJK, admin) check in anyone.
+
+        In every case the scanned face must match the selected member, so a
+        mismatch is rejected. A successful check-in also creates the join row if
+        the member had not joined yet.
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [descriptor, latitude, longitude]
+              properties:
+                descriptor: { $ref: '#/components/schemas/Descriptor' }
+                latitude: { type: number }
+                longitude: { type: number }
+                accuracy:
+                  type: number
+                  description: GPS accuracy in metres, used to explain a failed geofence check.
+                forUserId:
+                  type: string
+                  format: uuid
+                  description: |
+                    Who to check in. Omit for yourself; a dependent id for your
+                    own child; any member id when you hold `identifyMembers`.
+      responses:
+        '200':
+          description: Checked in
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  attendance: { $ref: '#/components/schemas/ProgramAttendance' }
+                  memberName: { type: string, description: Who was checked in. }
+                  confidence:
+                    type: number
+                    description: Face match confidence, `1 - distance`. Higher is better.
+                  distance: { type: number, description: Face descriptor distance. }
+                  distanceFromVenue:
+                    type: number
+                    nullable: true
+                    description: Metres from the geofence centre.
+                  accuracy: { type: number, nullable: true }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401':
+          description: The scanned face was not recognized.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: |
+            Outside the geofence, outside the check-in window, check-in disabled,
+            or the scanned face did not match the selected member.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: |
+            Check-in is closed for this program — either `check_in_enabled` is
+            false, the window has not opened yet, or it has already closed.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /programs/{id}/attendance:
+    get:
+      tags: [Programs]
+      summary: Program roster
+      description: |
+        Joined members with their check-in state, ordered checked-in first.
+        Rows with a `joined_at` but no `checked_in_at` are no-shows.
+      x-capability: managePrograms
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  program: { $ref: '#/components/schemas/Program' }
+                  attendance:
+                    type: array
+                    items: { $ref: '#/components/schemas/ProgramAttendance' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /programs/{id}/attendance/manual:
+    post:
+      tags: [Programs]
+      summary: Manual program check-in
+      description: |
+        Records attendance on a member's behalf, e.g. when face verification
+        failed. Unlike member check-in this is not restricted to the program
+        window and is not geofenced — the admin's own judgement is the proof.
+      x-capability: managePrograms
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [userId]
+              properties:
+                userId: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Recorded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  attendance: { $ref: '#/components/schemas/ProgramAttendance' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /programs/{id}/attendance/{userId}:
+    delete:
+      tags: [Programs]
+      summary: Undo a program check-in
+      description: |
+        Clears the check-in but keeps the join row, so the member returns to
+        "joined, not attended" rather than being removed from the roster.
+      x-capability: managePrograms
+      parameters:
+        - $ref: '#/components/parameters/Id'
+        - name: userId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { description: Undone }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
 
   # -------------------------------------------------------------- Telegram
   /telegram/link-token:

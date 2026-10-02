@@ -341,6 +341,23 @@ textarea:focus {
   color: var(--slate-800);
 }
 
+/* Inline checkbox + label, used by the program form. */
+.check-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--slate-800);
+  cursor: pointer;
+}
+
+.check-row input {
+  width: auto;
+  margin: 0;
+}
+
 /* ---- Member picker (searchable select) ---- */
 .member-picker {
   position: relative;
@@ -1060,9 +1077,23 @@ textarea:focus {
 }
 
 /* ---- Kiosk / wall display (non-scrolling) ---- */
+/* The stage fills the viewport and centres the fixed-size kiosk, which is
+   scaled down via a transform so the same layout fits any monitor. */
+.kiosk-stage {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(160deg, var(--teal-700), var(--teal-900));
+}
+
 .kiosk {
-  height: 100vh;
-  height: 100dvh;
+  width: 1920px;
+  height: 1080px;
+  flex-shrink: 0;
+  transform-origin: center center;
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -1277,19 +1308,6 @@ textarea:focus {
 
 .kiosk-stats .stat .label {
   font-size: 0.68rem;
-}
-
-/* Narrow screens: stack the columns but still avoid scrolling. */
-@media (max-width: 900px) {
-  .kiosk-body {
-    grid-template-columns: 1fr;
-  }
-  .kiosk-right {
-    flex-direction: row;
-  }
-  .kiosk-stats {
-    grid-template-columns: repeat(3, 1fr);
-  }
 }
 
 /* Community group link, sitting under the stats in the kiosk sidebar. */

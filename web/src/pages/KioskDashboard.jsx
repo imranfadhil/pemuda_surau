@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { QRCodeSVG } from 'qrcode.react';
 import {
@@ -16,6 +16,36 @@ const ROTATE_MS = 12000;
 const TOP_N = 10;
 // How often to refresh data from the API.
 const REFRESH_MS = 60000;
+
+// The wall display is designed for a large landscape monitor. We render it at
+// this fixed "design size" and scale it down to fit smaller screens, so the
+// exact same layout works on a 1366×768 monitor without clipping or scrolling.
+const DESIGN_WIDTH = 1920;
+const DESIGN_HEIGHT = 1080;
+
+/**
+ * Scale the fixed-size kiosk stage so it always fits the viewport, preserving
+ * the design's aspect ratio (letterboxed with the teal background showing
+ * through). Returns the scale factor to apply via CSS transform.
+ */
+function useFitScale() {
+  const [scale, setScale] = useState(1);
+  useLayoutEffect(() => {
+    const update = () => {
+      const w = window.innerWidth;
+      const h = window.innerHeight;
+      setScale(Math.min(w / DESIGN_WIDTH, h / DESIGN_HEIGHT));
+    };
+    update();
+    window.addEventListener('resize', update);
+    window.addEventListener('orientationchange', update);
+    return () => {
+      window.removeEventListener('resize', update);
+      window.removeEventListener('orientationchange', update);
+    };
+  }, []);
+  return scale;
+}
 
 function useClock() {
   const [now, setNow] = useState(() => new Date());
@@ -245,6 +275,7 @@ function MobileDashboard({ stats, weeklyChart, monthly, yearly, category, catInd
  */
 export default function KioskDashboard({ publicHome = false }) {
   const isMobile = useIsMobile();
+  const fitScale = useFitScale();
   const now = useClock();
   const [stats, setStats] = useState(null);
   const [weekly, setWeekly] = useState([]);
@@ -354,8 +385,9 @@ export default function KioskDashboard({ publicHome = false }) {
   }
 
   return (
-    <div className="kiosk">
-      <header className="kiosk-header">
+    <div className="kiosk-stage">
+      <div className="kiosk" style={{ transform: `scale(${fitScale})` }}>
+        <header className="kiosk-header">
         <div className="kiosk-brand">
           <img className="brand-logo" src="/logo.png" alt="" />
           <div>
@@ -471,6 +503,7 @@ export default function KioskDashboard({ publicHome = false }) {
             </div>
           </div>
         </aside>
+        </div>
       </div>
     </div>
   );
