@@ -33,7 +33,7 @@ body,
 
 body {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  background: var(--slate-50);
+  background: var(--slate-100);
   color: var(--slate-900);
   -webkit-font-smoothing: antialiased;
 }
@@ -545,6 +545,7 @@ textarea:focus {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
   gap: 12px;
+  margin-top: 16px;
   margin-bottom: 16px;
 }
 
@@ -996,10 +997,17 @@ textarea:focus {
   border-bottom: 1px solid var(--slate-100);
 }
 
+/* Banded (zebra) rows make wide tables easier to scan across columns. The
+   first row stays white so it doesn't blend into the slate header above it. */
+.datatable tbody tr:nth-child(even) {
+  background: var(--slate-50);
+}
+
 .datatable tbody tr:last-child {
   border-bottom: none;
 }
 
+/* Declared after the stripe so hover wins on banded rows too. */
 .datatable tbody tr:hover {
   background: var(--teal-50);
 }
@@ -1045,6 +1053,17 @@ textarea:focus {
   text-overflow: ellipsis;
   white-space: nowrap;
   vertical-align: bottom;
+}
+
+/* Quran details inside the staff DataTable: let the free-text note wrap rather
+   than forcing the whole table wide. */
+.datatable .quran-cell-details {
+  white-space: normal;
+  max-width: 320px;
+}
+
+.datatable .quran-cell-details .quran-note {
+  margin-top: 6px;
 }
 
 .auth-wrap {

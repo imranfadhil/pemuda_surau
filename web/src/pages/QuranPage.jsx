@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../lib/api.js';
 import { useAuth } from '../lib/auth.jsx';
+import DataTable from '../components/DataTable.jsx';
 import FaceScan from '../components/FaceScan.jsx';
 import MemberPicker from '../components/MemberPicker.jsx';
 import QuranLogDetails from '../components/QuranLogDetails.jsx';
@@ -36,6 +37,9 @@ export default function QuranPage() {
   const [editing, setEditing] = useState(null);
   const [editForm, setEditForm] = useState({ kind: 'recitation', surah: '', juz: '', pages: '', note: '' });
   const [editBusy, setEditBusy] = useState(false);
+  // The edit form lives at the bottom of the page; bring it into view when a
+  // teacher clicks Edit so they don't have to scroll down to find it.
+  const editRef = useRef(null);
 
   const [form, setForm] = useState({
     userId: '',
@@ -66,6 +70,12 @@ export default function QuranPage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    if (editing && editRef.current) {
+      editRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, [editing]);
 
   const recordingForOther = canManage && form.userId && form.userId !== user?.id;
   // Staff recording for another member may do so from anywhere; the server
@@ -110,10 +120,12 @@ export default function QuranPage() {
     }
   }
 
-  async function remove(id) {
+  async function remove(log) {
     setError('');
+    const who = log.full_name ? `${log.full_name}'s` : 'this';
+    if (!window.confirm(`Delete ${who} Quran activity? This cannot be undone.`)) return;
     try {
-      await api.deleteQuran(id);
+      await api.deleteQuran(log.id);
       loadMine();
       loadRecent();
     } catch (err) {
@@ -170,6 +182,98 @@ export default function QuranPage() {
   }
 
   const selectedName = members.find((m) => m.id === form.userId)?.fullName;
+
+  // Staff-only table of every member's activity. Kept in a memo because
+  // DataTable uses it as a dependency for filtering/sorting.
+  const recentColumns = useMemo(
+    () => [
+      {
+        key: 'full_name',
+        label: 'Member',
+        sortable: true,
+        render: (log) => log.full_name || <span className="muted">—</span>,
+      },
+      {
+        key: 'kind',
+        label: 'Type',
+        sortable: true,
+        render: (log) => (
+          <span className={`pill ${log.kind === 'memorization' ? 'quran-pill-mem' : 'quran-pill-rec'}`}>
+            {log.kind === 'recitation' ? '📖 Recitation' : '🧠 Memorization'}
+          </span>
+        ),
+      },
+      {
+        key: 'details',
+        label: 'Details',
+        searchValue: (log) =>
+          [log.surah, log.juz, log.pages, log.note].filter(Boolean).join(' '),
+        render: (log) => {
+          const facts = [
+            log.surah,
+            log.juz ? `Juz ${log.juz}` : null,
+            log.pages ? `${log.pages} ${log.pages === 1 ? 'page' : 'pages'}` : null,
+          ].filter(Boolean);
+          return (
+            <div className="quran-cell-details">
+              {facts.length > 0 ? (
+                <div className="quran-facts" style={{ marginTop: 0 }}>
+                  {facts.map((f) => (
+                    <span key={f} className="quran-fact">
+                      {f}
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <span className="muted">—</span>
+              )}
+              {log.note && <div className="quran-note">📝 {log.note}</div>}
+            </div>
+          );
+        },
+      },
+      {
+        key: 'logged_date',
+        label: 'Date',
+        sortable: true,
+        render: (log) => <span className="muted">{formatDate(log.logged_date)}</span>,
+      },
+      {
+        key: 'logged_by_name',
+        label: 'Recorded by',
+        sortable: true,
+        render: (log) =>
+          log.logged_by_name ? (
+            <span>
+              {log.logged_by_name}
+              {log.updated_by_name && (
+                <span className="quran-edited"> · ✏️ {log.updated_by_name}</span>
+              )}
+            </span>
+          ) : (
+            <span className="muted">Self-logged</span>
+          ),
+      },
+      {
+        key: 'actions',
+        label: 'Actions',
+        align: 'right',
+        searchValue: () => '',
+        render: (log) => (
+          <div className="row-btns">
+            <button className="btn btn-sm btn-secondary" onClick={() => startEdit(log)}>
+              Edit
+            </button>
+            <button className="btn btn-sm btn-danger" onClick={() => remove(log)}>
+              Delete
+            </button>
+          </div>
+        ),
+      },
+    ],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
 
   return (
     <div>
@@ -330,7 +434,7 @@ export default function QuranPage() {
                 <button className="btn btn-sm btn-secondary" onClick={() => startEdit(log)}>
                   Edit
                 </button>
-                <button className="btn btn-sm btn-secondary" onClick={() => remove(log.id)}>
+                <button className="btn btn-sm btn-danger" onClick={() => remove(log)}>
                   Delete
                 </button>
               </div>
@@ -356,28 +460,19 @@ export default function QuranPage() {
       {canManage && (
         <div className="card">
           <h2 className="card-title">Recent activity (all members)</h2>
-          {recent.length === 0 ? (
-            <p className="muted">No Quran activity recorded yet.</p>
-          ) : (
-            recent.slice(0, 20).map((log) => (
-              <div key={log.id} className="quran-log-row">
-                <QuranLogDetails log={log} showMember />
-                <div className="row-btns">
-                  <button className="btn btn-sm btn-secondary" onClick={() => startEdit(log)}>
-                    Edit
-                  </button>
-                  <button className="btn btn-sm btn-secondary" onClick={() => remove(log.id)}>
-                    Delete
-                  </button>
-                </div>
-              </div>
-            ))
-          )}
+          <DataTable
+            columns={recentColumns}
+            rows={recent}
+            getRowKey={(log) => log.id}
+            initialSort={{ key: 'logged_date', dir: 'desc' }}
+            searchPlaceholder="Search member, surah, note…"
+            emptyMessage="No Quran activity recorded yet."
+          />
         </div>
       )}
 
       {editing && (
-        <form className="card" onSubmit={saveEdit}>
+        <form className="card" onSubmit={saveEdit} ref={editRef}>
           <div className="row-between" style={{ marginBottom: 12 }}>
             <h2 className="card-title" style={{ margin: 0 }}>✏️ Edit Quran activity</h2>
             <button type="button" className="btn btn-sm btn-secondary" onClick={cancelEdit}>

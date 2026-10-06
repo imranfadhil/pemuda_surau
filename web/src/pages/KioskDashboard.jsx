@@ -11,7 +11,7 @@ import { useIsMobile } from '../lib/device.js';
 import InstallPrompt from '../components/InstallPrompt.jsx';
 
 // How long each leaderboard category stays on screen before rotating.
-const ROTATE_MS = 12000;
+const ROTATE_MS = 7000;
 // How many members to show per column (keeps everything on one screen).
 const TOP_N = 10;
 // How often to refresh data from the API.
