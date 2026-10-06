@@ -76,7 +76,7 @@ export default function HomePage() {
         </div>
       )}
 
-      <div className="stat-grid">
+      <div className="stat-grid" data-tour="home-stats">
         <div className="stat">
           <div className="value">{loading ? '–' : today.length}/5</div>
           <div className="label">🕌 Today</div>

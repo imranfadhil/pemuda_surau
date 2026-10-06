@@ -1329,6 +1329,97 @@ textarea:focus {
   font-size: 0.68rem;
 }
 
+/* ---------------------------------------------------------------------------
+   Onboarding tour (see components/Tour.jsx + lib/onboarding.js)
+   A fixed overlay with a transparent "spotlight" hole over the target element
+   (created with a huge box-shadow) and a tooltip card.
+   --------------------------------------------------------------------------- */
+
+.tour-root {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+}
+
+.tour-blocker {
+  position: absolute;
+  inset: 0;
+}
+
+.tour-highlight {
+  position: fixed;
+  border-radius: 12px;
+  pointer-events: none;
+  box-shadow: 0 0 0 9999px rgba(15, 23, 42, 0.62);
+  transition: top 0.25s ease, left 0.25s ease, width 0.25s ease, height 0.25s ease;
+}
+
+.tour-tooltip {
+  position: fixed;
+  background: white;
+  border-radius: var(--radius);
+  box-shadow: 0 20px 50px rgba(15, 23, 42, 0.35);
+  padding: 16px 18px 18px;
+  max-width: calc(100vw - 28px);
+  animation: tour-pop 0.18s ease;
+}
+
+@keyframes tour-pop {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.tour-progress {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--teal-700);
+}
+
+.tour-skip {
+  background: none;
+  color: var(--slate-400);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 2px 4px;
+}
+
+.tour-skip:hover {
+  color: var(--slate-600);
+}
+
+.tour-title {
+  margin: 8px 0 6px;
+  font-size: 1.05rem;
+}
+
+.tour-body {
+  margin: 0 0 16px;
+  color: var(--slate-600);
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+
+.tour-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.tour-actions .btn {
+  min-width: 84px;
+}
+
 /* Community group link, sitting under the stats in the kiosk sidebar. */
 .kiosk-community {
   flex-shrink: 0;

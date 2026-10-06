@@ -124,7 +124,7 @@ export default function MeritsPage() {
             <FaceScan onConfirmed={onScanConfirmed} onCancel={() => setScanOpen(false)} />
           )}
 
-          <form className="card" onSubmit={submit}>
+          <form className="card" data-tour="merits-form" onSubmit={submit}>
             <h2 className="card-title">Award merits</h2>
             <p className="muted" style={{ marginBottom: 12 }}>
               Scan the member's face at the surau, then award points.
@@ -206,7 +206,7 @@ export default function MeritsPage() {
         </>
       )}
 
-      <div className="card">
+      <div className="card" data-tour="merits-list">
         <h2 className="card-title">My merits</h2>
         {mine.merits.length === 0 ? (
           <p className="muted">No merits yet.</p>

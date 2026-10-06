@@ -307,7 +307,7 @@ export default function QuranPage() {
         <FaceScan onConfirmed={onScanConfirmed} onCancel={() => setScanOpen(false)} />
       )}
 
-      <form className="card" onSubmit={submit}>
+      <form className="card" data-tour="quran-form" onSubmit={submit}>
         <h2 className="card-title">Record activity</h2>
 
         {canManage && (

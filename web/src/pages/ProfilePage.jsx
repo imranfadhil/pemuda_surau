@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { api } from '../lib/api.js';
 import { useAuth } from '../lib/auth.jsx';
 import AddressAutocomplete from '../components/AddressAutocomplete.jsx';
+import { TourButton } from '../components/Tour.jsx';
 import { PRAYER_LABELS, formatDate, SURAU, CATEGORIES, badgeFor, ROLE_LABELS } from '../lib/constants.js';
 import { ageLabel } from '../lib/age.js';
 
@@ -280,7 +281,7 @@ export default function ProfilePage() {
       <h1 className="page-title">Profile</h1>
       <p className="page-sub">Your account and attendance history.</p>
 
-      <div className="card">
+      <div className="card" data-tour="profile-card">
         <div className="row-between">
           <div>
             <strong style={{ fontSize: '1.1rem' }}>{user?.fullName}</strong>
@@ -297,6 +298,7 @@ export default function ProfilePage() {
           <Link className="btn btn-sm btn-secondary" to="/register">
             {user?.hasFace ? 'Re-enroll face' : 'Enroll face'}
           </Link>
+          <TourButton />
           <button className="btn btn-sm btn-danger" onClick={logout}>
             Log out
           </button>

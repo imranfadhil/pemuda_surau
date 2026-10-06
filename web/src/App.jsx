@@ -3,6 +3,7 @@ import { Routes, Route, Navigate, NavLink, Link, useLocation } from 'react-route
 import { useAuth } from './lib/auth.jsx';
 import CommunityLink from './components/CommunityLink.jsx';
 import InstallPrompt from './components/InstallPrompt.jsx';
+import { TourProvider } from './components/Tour.jsx';
 import LoginPage from './pages/LoginPage.jsx';
 import RegisterPage from './pages/RegisterPage.jsx';
 import HomePage from './pages/HomePage.jsx';
@@ -47,7 +48,7 @@ function BottomNav() {
   }, [location.pathname]);
 
   return (
-    <nav className="bottom-nav" ref={navRef}>
+    <nav className="bottom-nav" data-tour="bottom-nav" ref={navRef}>
       {items.map((item) => (
         <NavLink key={item.to} to={item.to} end={item.to === '/'}>
           <span className="nav-icon">{item.icon}</span>
@@ -116,6 +117,7 @@ export default function App() {
         path="/*"
         element={
           token ? (
+            <TourProvider>
             <div className="app-shell">
               <TopBar />
               <main className="main">
@@ -210,6 +212,7 @@ export default function App() {
               </main>
               <BottomNav />
             </div>
+            </TourProvider>
           ) : (
             /* Logged out: the landing page is the non-scrolling wall display. */
             <Routes>

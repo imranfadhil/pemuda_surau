@@ -255,7 +255,7 @@ export default function DependentPage() {
       {error && <div className="alert alert-error">{error}</div>}
       {notice && <div className="alert alert-success">{notice}</div>}
 
-      <form className="card" onSubmit={save}>
+      <form className="card" data-tour="family-add" onSubmit={save}>
         <h2 className="card-title">{editingId ? 'Edit dependent' : 'Add a dependent'}</h2>
         <div className="field">
           <label htmlFor="depName">Full name</label>

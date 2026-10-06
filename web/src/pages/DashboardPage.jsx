@@ -153,7 +153,7 @@ export default function DashboardPage() {
       </div>
 
       {/* ---- Leaderboard (bottom, scrollable so it doesn't push content away) ---- */}
-      <div className="card">
+      <div className="card" data-tour="dashboard-leaderboard">
         <div className="row-between" style={{ marginBottom: 12 }}>
           <h2 className="card-title">🏆 Leaderboard</h2>
           <span className="pill">

@@ -241,7 +241,7 @@ export default function CheckInPage() {
         </div>
       )}
 
-      <div className="card">
+      <div className="card" data-tour="checkin-window">
         <h2 className="card-title">Current window</h2>
         {!win && winError ? (
           <div className="alert alert-error" style={{ marginTop: 12 }}>
@@ -312,7 +312,7 @@ export default function CheckInPage() {
           </div>
         )}
 
-        <div className="face-enroll-grid">
+        <div className="face-enroll-grid" data-tour="checkin-camera">
           <div>
             <div className="camera-wrap">
               <video
