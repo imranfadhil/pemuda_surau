@@ -84,6 +84,8 @@ export const api = {
   weekly: () => request('/dashboard/weekly'),
   leaderboard: (period = 'all', category = 'overall') =>
     request(`/dashboard/leaderboard?period=${period}&category=${category}`),
+  memberSummary: (id, period = 'all') =>
+    request(`/dashboard/member/${id}?period=${period}`),
   myBreakdown: () => request('/dashboard/me/breakdown'),
   myScores: () => request('/dashboard/me/scores'),
 

@@ -26,6 +26,9 @@ const CATEGORY_COLUMNS = {
 // Whitelisted ranking periods.
 const PERIODS = ['month', 'year', 'all'];
 
+// Simple guard so a malformed id can't reach a `::uuid` cast in the driver.
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 /**
  * Overall stats: totals, today's counts per prayer, and active member count.
  * Public: the dashboard is the app's landing page and is visible without login.
@@ -283,6 +286,119 @@ router.get(
 
     const ranked = rows.map((row, index) => ({ rank: index + 1, ...row }));
     res.json({ period, category, leaderboard: ranked });
+  }),
+);
+
+/**
+ * One member's full performance summary, for the prize-giving "highlight".
+ *
+ * The leaderboard row only carries a single score for the selected category;
+ * this endpoint returns EVERY category at once (overall, attendance, programs,
+ * recitation, memorization, merits) plus the per-prayer breakdown, so a member
+ * can be presented on their own during the ceremony.
+ *
+ * Public: derived from the same data the public leaderboard already exposes.
+ */
+router.get(
+  '/member/:id',
+  asyncHandler(async (req, res) => {
+    if (!UUID_RE.test(req.params.id)) {
+      return res.status(400).json({ error: 'Invalid member id' });
+    }
+    const period = PERIODS.includes(req.query.period) ? req.query.period : 'all';
+
+    const { rows } = await query(
+      `WITH period AS (
+         SELECT CASE
+           WHEN $2 = 'month' THEN date_trunc('month', CURRENT_DATE)::date
+           WHEN $2 = 'year'  THEN date_trunc('year', CURRENT_DATE)::date
+           ELSE NULL
+         END AS start_date
+       ),
+       att AS (
+         SELECT COUNT(*)::int AS attendance,
+                COUNT(DISTINCT a.attendance_date)::int AS days_attended,
+                COUNT(*) FILTER (WHERE a.prayer = 'subuh')::int   AS subuh,
+                COUNT(*) FILTER (WHERE a.prayer = 'zuhur')::int   AS zuhur,
+                COUNT(*) FILTER (WHERE a.prayer = 'asar')::int    AS asar,
+                COUNT(*) FILTER (WHERE a.prayer = 'maghrib')::int AS maghrib,
+                COUNT(*) FILTER (WHERE a.prayer = 'isyak')::int   AS isyak,
+                COALESCE(SUM(CASE a.prayer WHEN 'subuh' THEN 10 ELSE 5 END), 0)::int AS attendance_points
+         FROM attendance a, period p
+         WHERE a.user_id = $1
+           AND (p.start_date IS NULL OR a.attendance_date >= p.start_date)
+       ),
+       rec AS (
+         SELECT COUNT(*)::int AS recitation
+         FROM quran_logs q, period p
+         WHERE q.user_id = $1 AND q.kind = 'recitation'
+           AND (p.start_date IS NULL OR q.logged_date >= p.start_date)
+       ),
+       mem AS (
+         SELECT COUNT(*)::int AS memorization
+         FROM quran_logs q, period p
+         WHERE q.user_id = $1 AND q.kind = 'memorization'
+           AND (p.start_date IS NULL OR q.logged_date >= p.start_date)
+       ),
+       mer AS (
+         SELECT COALESCE(SUM(m.points), 0)::int AS merits
+         FROM merits m, period p
+         WHERE m.user_id = $1
+           AND (p.start_date IS NULL OR m.awarded_at >= p.start_date)
+       ),
+       prog AS (
+         SELECT COALESCE(SUM(pa.bonus_points), 0)::int AS programs
+         FROM program_attendance pa, period p
+         WHERE pa.user_id = $1 AND pa.checked_in_at IS NOT NULL
+           AND (p.start_date IS NULL OR pa.checked_in_at >= p.start_date)
+       )
+       SELECT u.id, u.full_name, u.avatar_url,
+              g.full_name AS guardian_name,
+              CASE WHEN u.phone IS NOT NULL THEN RIGHT(u.phone, 4) END AS phone_last4,
+              att.attendance, att.days_attended, att.attendance_points,
+              att.subuh, att.zuhur, att.asar, att.maghrib, att.isyak,
+              rec.recitation, mem.memorization, mer.merits, prog.programs,
+              ((att.attendance_points
+                + (rec.recitation + mem.memorization) * 5
+                + mer.merits
+                + prog.programs))::int AS overall
+       FROM users u
+       LEFT JOIN users g ON g.id = u.guardian_id
+       CROSS JOIN att, rec, mem, mer, prog
+       WHERE u.id = $1 AND u.is_active = TRUE`,
+      [req.params.id, period],
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Member not found' });
+    }
+
+    const row = rows[0];
+    res.json({
+      period,
+      member: {
+        id: row.id,
+        full_name: row.full_name,
+        avatar_url: row.avatar_url,
+        guardian_name: row.guardian_name,
+        phone_last4: row.phone_last4,
+        attendance: row.attendance,
+        days_attended: row.days_attended,
+        attendance_points: row.attendance_points,
+        recitation: row.recitation,
+        memorization: row.memorization,
+        merits: row.merits,
+        programs: row.programs,
+        overall: row.overall,
+        prayers: {
+          subuh: row.subuh,
+          zuhur: row.zuhur,
+          asar: row.asar,
+          maghrib: row.maghrib,
+          isyak: row.isyak,
+        },
+      },
+    });
   }),
 );
 

@@ -6,6 +6,7 @@ import { api } from '../lib/api.js';
 import { useAuth } from '../lib/auth.jsx';
 import { PRAYERS, CATEGORIES, PERIODS, badgeFor } from '../lib/constants.js';
 import { duplicateNameKeys, disambiguatorFor } from '../lib/members.js';
+import MemberHighlight from '../components/MemberHighlight.jsx';
 
 // Distinct, readable teals for the stacked prayer segments.
 const PRAYER_COLORS = {
@@ -24,6 +25,8 @@ export default function DashboardPage() {
   const [period, setPeriod] = useState('month');
   const [category, setCategory] = useState('overall');
   const [loading, setLoading] = useState(true);
+  // Index of the member shown in the prize-giving highlight, or null when closed.
+  const [highlight, setHighlight] = useState(null);
 
   useEffect(() => {
     api.stats().then(setStats).catch(() => {});
@@ -163,6 +166,9 @@ export default function DashboardPage() {
             {activeCategory.icon} {activeCategory.label}
           </span>
         </div>
+        <p className="muted" style={{ marginTop: -6, marginBottom: 10 }}>
+          🎤 Tap a member to show their performance highlight — great for prize giving.
+        </p>
 
         <div className="tab-row">
           {PERIODS.map((p) => (
@@ -194,14 +200,26 @@ export default function DashboardPage() {
           <p className="muted">No activity recorded yet.</p>
         ) : (
           <div className="leader-scroll">
-            {leaders.map((row) => {
+            {leaders.map((row, i) => {
               const medal = row.rank === 1 ? 'gold' : row.rank === 2 ? 'silver' : row.rank === 3 ? 'bronze' : '';
               const isMe = row.id === user?.id;
               const score = row[category] ?? 0;
               const badge = badgeFor(score);
               const disambig = disambiguatorFor(row, duplicateNames);
               return (
-                <div key={row.id} className="leader-row">
+                <div
+                  key={row.id}
+                  className="leader-row leader-row-click"
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => setHighlight(i)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      setHighlight(i);
+                    }
+                  }}
+                >
                   <div className={`rank-badge ${medal}`}>{row.rank}</div>
                   <div className="leader-name">
                     {row.full_name}
@@ -229,6 +247,16 @@ export default function DashboardPage() {
           </div>
         )}
       </div>
+
+      {highlight !== null && leaders[highlight] && (
+        <MemberHighlight
+          members={leaders}
+          index={highlight}
+          onIndexChange={setHighlight}
+          onClose={() => setHighlight(null)}
+          period={period}
+        />
+      )}
     </div>
   );
 }

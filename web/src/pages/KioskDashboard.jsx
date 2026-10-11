@@ -9,6 +9,7 @@ import { CATEGORIES, badgeFor, SURAU, COMMUNITY } from '../lib/constants.js';
 import { duplicateNameKeys, disambiguatorFor } from '../lib/members.js';
 import { useIsMobile } from '../lib/device.js';
 import InstallPrompt from '../components/InstallPrompt.jsx';
+import MemberHighlight from '../components/MemberHighlight.jsx';
 
 // How long each leaderboard category stays on screen before rotating.
 const ROTATE_MS = 7000;
@@ -56,7 +57,7 @@ function useClock() {
   return now;
 }
 
-function LeaderColumn({ title, rows, category, duplicates }) {
+function LeaderColumn({ title, rows, category, duplicates, onSelect, selectedId, periodKey }) {
   return (
     <div className="kiosk-leader-col">
       <div className="kiosk-leader-head">{title}</div>
@@ -69,7 +70,13 @@ function LeaderColumn({ title, rows, category, duplicates }) {
           const badge = badgeFor(score);
           const disambig = disambiguatorFor(row, duplicates);
           return (
-            <div key={row.id} className="kiosk-leader-row">
+            <div
+              key={row.id}
+              className={`kiosk-leader-row${onSelect ? ' kiosk-leader-click' : ''}${selectedId === row.id ? ' active' : ''}`}
+              role={onSelect ? 'button' : undefined}
+              tabIndex={onSelect ? 0 : undefined}
+              onClick={onSelect ? () => onSelect(row, periodKey) : undefined}
+            >
               <div className={`rank-badge ${medal}`}>{row.rank}</div>
               <div className="kiosk-leader-name">
                 {row.full_name}
@@ -131,7 +138,7 @@ function MobileNotice() {
  * wall display (no login QR, no rotation), but laid out as a normal scrolling
  * page so it works on a phone.
  */
-function MobileDashboard({ stats, weeklyChart, monthly, yearly, category, catIndex, onSelectCat, duplicates }) {
+function MobileDashboard({ stats, weeklyChart, monthly, yearly, category, catIndex, onSelectCat, duplicates, onSelectMember, selectedId }) {
   const dateStr = new Date().toLocaleDateString(undefined, {
     weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
   });
@@ -195,8 +202,24 @@ function MobileDashboard({ stats, weeklyChart, monthly, yearly, category, catInd
           ))}
         </div>
         <div className="mobile-leader-grid">
-          <LeaderColumn title="This month" rows={monthly} category={category} duplicates={duplicates} />
-          <LeaderColumn title="This year" rows={yearly} category={category} duplicates={duplicates} />
+          <LeaderColumn
+            title="This month"
+            rows={monthly}
+            category={category}
+            duplicates={duplicates}
+            onSelect={onSelectMember}
+            selectedId={selectedId}
+            periodKey="month"
+          />
+          <LeaderColumn
+            title="This year"
+            rows={yearly}
+            category={category}
+            duplicates={duplicates}
+            onSelect={onSelectMember}
+            selectedId={selectedId}
+            periodKey="year"
+          />
         </div>
       </div>
 
@@ -283,12 +306,22 @@ export default function KioskDashboard({ publicHome = false }) {
   const [yearly, setYearly] = useState([]);
   const [catIndex, setCatIndex] = useState(0);
   const [loginUrl, setLoginUrl] = useState('');
+  // Prize-giving highlight: the member + the queue (rows shown on the board
+  // they were picked from) + which board it came from, so prev/next walk that
+  // same column. null = closed.
+  const [highlight, setHighlight] = useState(null);
 
   const category = CATEGORIES[catIndex];
 
   // Names are not unique, so tell same-named members apart by phone last-4 —
   // but only when a collision actually exists in the displayed boards.
   const duplicates = duplicateNameKeys([...monthly, ...yearly]);
+
+  const openHighlight = (row, periodKey) => {
+    const list = periodKey === 'year' ? yearly : monthly;
+    const idx = Math.max(0, list.findIndex((r) => r.id === row.id));
+    setHighlight({ list, index: idx, period: periodKey, id: row.id });
+  };
 
   useEffect(() => {
     // Auto-generate the login link from the current URL so the QR always
@@ -331,11 +364,13 @@ export default function KioskDashboard({ publicHome = false }) {
     };
   }, [category.key]);
 
-  // Rotate through the categories so every board gets screen time.
+  // Rotate through the categories so every board gets screen time. Paused while
+  // a prize-giving highlight is open, so the board behind it stays put.
   useEffect(() => {
+    if (highlight) return undefined;
     const t = setInterval(() => setCatIndex((i) => (i + 1) % CATEGORIES.length), ROTATE_MS);
     return () => clearInterval(t);
-  }, []);
+  }, [highlight]);
 
   // Normalise each category against its own weekly peak, so every category is
   // visible and comparable across the week (a single global max would make the
@@ -382,6 +417,8 @@ export default function KioskDashboard({ publicHome = false }) {
         catIndex={catIndex}
         onSelectCat={setCatIndex}
         duplicates={duplicates}
+        onSelectMember={openHighlight}
+        selectedId={highlight?.id}
       />
     );
   }
@@ -420,8 +457,24 @@ export default function KioskDashboard({ publicHome = false }) {
               </div>
             </div>
             <div className="kiosk-leader-grid">
-              <LeaderColumn title="This month" rows={monthly} category={category} duplicates={duplicates} />
-              <LeaderColumn title="This year" rows={yearly} category={category} duplicates={duplicates} />
+              <LeaderColumn
+                title="This month"
+                rows={monthly}
+                category={category}
+                duplicates={duplicates}
+                onSelect={openHighlight}
+                selectedId={highlight?.id}
+                periodKey="month"
+              />
+              <LeaderColumn
+                title="This year"
+                rows={yearly}
+                category={category}
+                duplicates={duplicates}
+                onSelect={openHighlight}
+                selectedId={highlight?.id}
+                periodKey="year"
+              />
             </div>
           </div>
 
@@ -508,6 +561,16 @@ export default function KioskDashboard({ publicHome = false }) {
         </aside>
         </div>
       </div>
+
+      {highlight && highlight.list[highlight.index] && (
+        <MemberHighlight
+          members={highlight.list}
+          index={highlight.index}
+          onIndexChange={(i) => setHighlight((h) => (h ? { ...h, index: i, id: h.list[i]?.id } : h))}
+          onClose={() => setHighlight(null)}
+          period={highlight.period}
+        />
+      )}
     </div>
   );
 }

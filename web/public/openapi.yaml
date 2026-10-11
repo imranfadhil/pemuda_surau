@@ -1360,6 +1360,54 @@ paths:
                         memorization: { type: integer }
                         merits: { type: integer }
 
+  /dashboard/member/{id}:
+    get:
+      tags: [Dashboard]
+      summary: One member's full score summary
+      description: |
+        Public. Returns a single member's scores across EVERY category plus the
+        per-prayer breakdown, for the prize-giving "highlight". Derived from the
+        same data the public leaderboard already exposes.
+      security: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: period
+          in: query
+          schema: { type: string, enum: [month, year, all], default: all }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  period: { type: string }
+                  member:
+                    type: object
+                    properties:
+                      id: { type: string, format: uuid }
+                      full_name: { type: string }
+                      avatar_url: { type: string, nullable: true }
+                      guardian_name: { type: string, nullable: true }
+                      phone_last4: { type: string, nullable: true }
+                      attendance: { type: integer }
+                      days_attended: { type: integer }
+                      attendance_points: { type: integer }
+                      recitation: { type: integer }
+                      memorization: { type: integer }
+                      merits: { type: integer }
+                      programs: { type: integer }
+                      overall: { type: integer }
+                      prayers:
+                        type: object
+                        additionalProperties: { type: integer }
+        '400': { description: Invalid member id }
+        '404': { description: Member not found }
+
   /dashboard/me/breakdown:
     get:
       tags: [Dashboard]
