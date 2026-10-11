@@ -128,6 +128,40 @@ ALTER TABLE programs ADD COLUMN IF NOT EXISTS check_in_grace_minutes INT NOT NUL
 -- still record attendance manually.
 ALTER TABLE programs ADD COLUMN IF NOT EXISTS check_in_enabled BOOLEAN NOT NULL DEFAULT TRUE;
 
+-- ---------------------------------------------------------------------------
+-- Program posters, links and recurrence.
+--
+-- A poster is stored inline as a data URL (resized in the browser before it is
+-- sent) so no external file host is required. `links` is a JSON array of
+-- { label, url } objects (e.g. a WhatsApp group and a registration form).
+--
+-- A program may repeat weekly on a set of weekdays. Each occurrence's start and
+-- end is either a fixed wall-clock time or anchored to a prayer (e.g. Maghrib
+-- to Isyak), resolved per date in the surau timezone.
+-- ---------------------------------------------------------------------------
+ALTER TABLE programs ADD COLUMN IF NOT EXISTS poster_url TEXT;
+ALTER TABLE programs ADD COLUMN IF NOT EXISTS links JSONB NOT NULL DEFAULT '[]'::jsonb;
+ALTER TABLE programs ADD COLUMN IF NOT EXISTS recurrence_days TEXT[] NOT NULL DEFAULT '{}';
+ALTER TABLE programs ADD COLUMN IF NOT EXISTS recurrence_until DATE;
+ALTER TABLE programs ADD COLUMN IF NOT EXISTS recurrence_start_mode TEXT NOT NULL DEFAULT 'fixed'
+  CHECK (recurrence_start_mode IN ('fixed', 'prayer'));
+ALTER TABLE programs ADD COLUMN IF NOT EXISTS recurrence_start_time TEXT;
+ALTER TABLE programs ADD COLUMN IF NOT EXISTS recurrence_start_prayer TEXT;
+ALTER TABLE programs ADD COLUMN IF NOT EXISTS recurrence_start_offset_minutes INT NOT NULL DEFAULT 0;
+ALTER TABLE programs ADD COLUMN IF NOT EXISTS recurrence_end_mode TEXT NOT NULL DEFAULT 'fixed'
+  CHECK (recurrence_end_mode IN ('fixed', 'prayer'));
+ALTER TABLE programs ADD COLUMN IF NOT EXISTS recurrence_end_time TEXT;
+ALTER TABLE programs ADD COLUMN IF NOT EXISTS recurrence_end_prayer TEXT;
+ALTER TABLE programs ADD COLUMN IF NOT EXISTS recurrence_end_offset_minutes INT NOT NULL DEFAULT 0;
+
+-- A recurring program has many sessions, so attendance is keyed by the session
+-- date (YYYY-MM-DD in the surau timezone). One-off programs use the sentinel
+-- date 0001-01-01 so the uniqueness rule stays a plain column constraint.
+ALTER TABLE program_attendance ADD COLUMN IF NOT EXISTS session_date DATE NOT NULL DEFAULT '0001-01-01';
+ALTER TABLE program_attendance DROP CONSTRAINT IF EXISTS program_attendance_program_id_user_id_key;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_program_attendance_session
+  ON program_attendance (program_id, user_id, session_date);
+
 CREATE TABLE IF NOT EXISTS settings (
   key        TEXT PRIMARY KEY,
   value      JSONB NOT NULL,

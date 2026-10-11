@@ -148,12 +148,18 @@ components:
 
     ProgramInput:
       type: object
-      required: [title, startsAt]
+      required: [title]
       properties:
         title: { type: string, maxLength: 160 }
         description: { type: string, maxLength: 2000, nullable: true }
         location: { type: string, maxLength: 200, nullable: true }
-        startsAt: { type: string, format: date-time }
+        startsAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: |
+            Required for a one-off program. A recurring program derives its
+            times from the recurrence rule and may omit it.
         endsAt: { type: string, format: date-time, nullable: true }
         category: { type: string, maxLength: 60, nullable: true }
         isPublished: { type: boolean, default: true }
@@ -180,13 +186,59 @@ components:
           type: boolean
           default: true
           description: When false, members cannot self check-in; staff can still record manually.
+        posterUrl:
+          type: string
+          nullable: true
+          description: |
+            Program poster as a data URL (resized in the browser) or an
+            external image URL.
+        links:
+          type: array
+          maxItems: 10
+          description: Labelled links (e.g. a WhatsApp group and a registration form).
+          items:
+            type: object
+            required: [label, url]
+            properties:
+              label: { type: string, maxLength: 60 }
+              url: { type: string, format: uri, maxLength: 500 }
+        recurrenceDays:
+          type: array
+          maxItems: 7
+          description: Weekdays the program repeats on. Empty means a one-off program.
+          items: { type: string, enum: [sun, mon, tue, wed, thu, fri, sat] }
+        recurrenceUntil:
+          type: string
+          format: date
+          nullable: true
+          description: Last date (inclusive) the recurrence applies. Null means indefinitely.
+        recurrenceStartMode: { type: string, enum: [fixed, prayer], default: fixed }
+        recurrenceStartTime:
+          type: string
+          nullable: true
+          description: 'Wall-clock start (HH:MM) when `recurrenceStartMode` is `fixed`.'
+        recurrenceStartPrayer:
+          type: string
+          enum: [subuh, zuhur, asar, maghrib, isyak]
+          nullable: true
+          description: Prayer the start is anchored to when `recurrenceStartMode` is `prayer`.
+        recurrenceStartOffsetMinutes: { type: integer, default: 0 }
+        recurrenceEndMode: { type: string, enum: [fixed, prayer], default: fixed }
+        recurrenceEndTime: { type: string, nullable: true }
+        recurrenceEndPrayer:
+          type: string
+          enum: [subuh, zuhur, asar, maghrib, isyak]
+          nullable: true
+        recurrenceEndOffsetMinutes: { type: integer, default: 0 }
 
     Program:
       type: object
       description: |
-        A program as returned to the client. `is_open` reflects the check-in
-        window (opens at `starts_at`, closes at `ends_at` — or three hours after
-        the start when `ends_at` is null — plus `check_in_grace_minutes`).
+        A program as returned to the client. For a one-off program `is_open`
+        reflects the check-in window (opens at `starts_at`, closes at `ends_at`
+        — or three hours after the start when `ends_at` is null — plus
+        `check_in_grace_minutes`). For a recurring program the window is derived
+        from the current or next occurrence.
       properties:
         id: { type: string, format: uuid }
         title: { type: string }
@@ -201,6 +253,31 @@ components:
         radius_meters: { type: integer, nullable: true }
         check_in_grace_minutes: { type: integer }
         check_in_enabled: { type: boolean }
+        poster_url: { type: string, nullable: true }
+        links:
+          type: array
+          items:
+            type: object
+            properties:
+              label: { type: string }
+              url: { type: string }
+        is_recurring: { type: boolean }
+        recurrence_days:
+          type: array
+          items: { type: string, enum: [sun, mon, tue, wed, thu, fri, sat] }
+        recurrence_until: { type: string, format: date, nullable: true }
+        recurrence_start_mode: { type: string, enum: [fixed, prayer] }
+        recurrence_start_time: { type: string, nullable: true }
+        recurrence_start_prayer: { type: string, nullable: true }
+        recurrence_start_offset_minutes: { type: integer }
+        recurrence_end_mode: { type: string, enum: [fixed, prayer] }
+        recurrence_end_time: { type: string, nullable: true }
+        recurrence_end_prayer: { type: string, nullable: true }
+        recurrence_end_offset_minutes: { type: integer }
+        recurrence_summary:
+          type: string
+          nullable: true
+          description: 'Human-readable summary, e.g. "Every Mon, Tue, Wed".'
         created_by: { type: string, format: uuid, nullable: true }
         created_by_name: { type: string, nullable: true }
         created_at: { type: string, format: date-time }
@@ -209,8 +286,15 @@ components:
           description: Whether the calling user has joined (or checked in to) this program.
         checked_in_at: { type: string, format: date-time, nullable: true }
         is_open: { type: boolean }
-        check_in_opens_at: { type: string, format: date-time }
-        check_in_closes_at: { type: string, format: date-time }
+        check_in_opens_at: { type: string, format: date-time, nullable: true }
+        check_in_closes_at: { type: string, format: date-time, nullable: true }
+        session_date:
+          type: string
+          format: date
+          nullable: true
+          description: The current/next session date for a recurring program.
+        next_start: { type: string, format: date-time, nullable: true }
+        next_end: { type: string, format: date-time, nullable: true }
         join_count: { type: integer }
         checked_in_count: { type: integer }
 
@@ -219,6 +303,7 @@ components:
       description: |
         One roster row. `joinedAt` records interest and `checkedInAt` records
         proven attendance, so a row with a join but no check-in is a no-show.
+        For a recurring program `sessionDate` identifies the session.
       properties:
         id: { type: string, format: uuid }
         userId: { type: string, format: uuid }
@@ -232,6 +317,11 @@ components:
         checkedInAt: { type: string, format: date-time, nullable: true }
         method: { type: string, enum: [face, manual] }
         faceScore: { type: number, nullable: true }
+        sessionDate:
+          type: string
+          format: date
+          nullable: true
+          description: Session date for a recurring program; null for a one-off.
         verifiedByName:
           type: string
           nullable: true
@@ -1400,10 +1490,12 @@ paths:
       tags: [Programs]
       summary: Face-verified program check-in
       description: |
-        Check-in is only accepted while the program window is open: it opens at
-        `starts_at` and closes at `ends_at` (or three hours after the start when
-        `ends_at` is null) plus `check_in_grace_minutes`. A program with
-        `check_in_enabled: false` rejects member check-in entirely.
+        Check-in is only accepted while the program window is open. For a
+        one-off program it opens at `starts_at` and closes at `ends_at` (or
+        three hours after the start when `ends_at` is null) plus
+        `check_in_grace_minutes`. For a recurring program the window is derived
+        from the current occurrence. A program with `check_in_enabled: false`
+        rejects member check-in entirely.
 
         The device must be inside the program's geofence — the program's own
         `latitude`/`longitude`/`radius_meters` when set, otherwise the surau's
@@ -1461,6 +1553,10 @@ paths:
                     nullable: true
                     description: Metres from the geofence centre.
                   accuracy: { type: number, nullable: true }
+                  sessionDate:
+                    type: string
+                    format: date
+                    description: Session date for a recurring program.
         '400': { $ref: '#/components/responses/BadRequest' }
         '401':
           description: The scanned face was not recognized.
@@ -1489,7 +1585,8 @@ paths:
       summary: Program roster
       description: |
         Joined members with their check-in state, ordered checked-in first.
-        Rows with a `joined_at` but no `checked_in_at` are no-shows.
+        Rows with a `joined_at` but no `checked_in_at` are no-shows. For a
+        recurring program each row carries its `sessionDate`.
       x-capability: managePrograms
       parameters:
         - $ref: '#/components/parameters/Id'
@@ -1528,6 +1625,12 @@ paths:
               required: [userId]
               properties:
                 userId: { type: string, format: uuid }
+                sessionDate:
+                  type: string
+                  format: date
+                  description: |
+                    Session to record for a recurring program. Defaults to the
+                    current or next occurrence.
       responses:
         '200':
           description: Recorded
@@ -1556,6 +1659,11 @@ paths:
           in: path
           required: true
           schema: { type: string, format: uuid }
+        - name: sessionDate
+          in: query
+          required: false
+          description: Session date for a recurring program.
+          schema: { type: string, format: date }
       responses:
         '200': { description: Undone }
         '403': { $ref: '#/components/responses/Forbidden' }

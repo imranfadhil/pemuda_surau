@@ -2,7 +2,16 @@ import { useEffect, useMemo, useState } from 'react';
 import { api } from '../lib/api.js';
 import DataTable from './DataTable.jsx';
 import MemberPicker from './MemberPicker.jsx';
-import { formatDateTime, SURAU } from '../lib/constants.js';
+import {
+  formatDateTime,
+  formatDate,
+  SURAU,
+  WEEKDAYS,
+  PRAYERS,
+  describeRecurrenceDays,
+  describeRecurrenceTime,
+} from '../lib/constants.js';
+import { fileToPosterDataUrl, dataUrlBytes } from '../lib/poster.js';
 
 /** `datetime-local` inputs need a local-time string, not an ISO/UTC one. */
 function toLocalInput(value) {
@@ -28,6 +37,19 @@ const EMPTY_FORM = {
   radiusMeters: '',
   checkInGraceMinutes: 30,
   checkInEnabled: true,
+  posterUrl: '',
+  links: [],
+  recurring: false,
+  recurrenceDays: [],
+  recurrenceUntil: '',
+  recurrenceStartMode: 'prayer',
+  recurrenceStartTime: '19:30',
+  recurrenceStartPrayer: 'maghrib',
+  recurrenceStartOffsetMinutes: 0,
+  recurrenceEndMode: 'prayer',
+  recurrenceEndTime: '21:00',
+  recurrenceEndPrayer: 'isyak',
+  recurrenceEndOffsetMinutes: 0,
 };
 
 function formFromProgram(p) {
@@ -45,17 +67,33 @@ function formFromProgram(p) {
     radiusMeters: p.radius_meters ?? '',
     checkInGraceMinutes: p.check_in_grace_minutes ?? 30,
     checkInEnabled: p.check_in_enabled,
+    posterUrl: p.poster_url || '',
+    links: Array.isArray(p.links) ? p.links : [],
+    recurring: Boolean(p.is_recurring),
+    recurrenceDays: Array.isArray(p.recurrence_days) ? p.recurrence_days : [],
+    recurrenceUntil: p.recurrence_until ? String(p.recurrence_until).slice(0, 10) : '',
+    recurrenceStartMode: p.recurrence_start_mode || 'prayer',
+    recurrenceStartTime: p.recurrence_start_time || '19:30',
+    recurrenceStartPrayer: p.recurrence_start_prayer || 'maghrib',
+    recurrenceStartOffsetMinutes: p.recurrence_start_offset_minutes ?? 0,
+    recurrenceEndMode: p.recurrence_end_mode || 'prayer',
+    recurrenceEndTime: p.recurrence_end_time || '21:00',
+    recurrenceEndPrayer: p.recurrence_end_prayer || 'isyak',
+    recurrenceEndOffsetMinutes: p.recurrence_end_offset_minutes ?? 0,
   };
 }
 
 /** Turn the form state into the API payload (shared by create and update). */
 function toPayload(form) {
+  const recurring = form.recurring && form.recurrenceDays.length > 0;
   return {
     title: form.title,
     description: form.description || null,
     location: form.location || null,
-    startsAt: new Date(form.startsAt).toISOString(),
-    endsAt: form.endsAt ? new Date(form.endsAt).toISOString() : null,
+    // A recurring program derives its times from the rule, so it needs no
+    // single start/end instant.
+    startsAt: recurring ? null : new Date(form.startsAt).toISOString(),
+    endsAt: recurring || !form.endsAt ? null : new Date(form.endsAt).toISOString(),
     category: form.category || 'program',
     isPublished: form.isPublished,
     latitude: form.useOwnLocation && form.latitude !== '' ? Number(form.latitude) : null,
@@ -64,6 +102,18 @@ function toPayload(form) {
       form.useOwnLocation && form.radiusMeters !== '' ? Number(form.radiusMeters) : null,
     checkInGraceMinutes: Number(form.checkInGraceMinutes) || 0,
     checkInEnabled: form.checkInEnabled,
+    posterUrl: form.posterUrl || null,
+    links: form.links.filter((l) => l.label && l.url),
+    recurrenceDays: recurring ? form.recurrenceDays : [],
+    recurrenceUntil: recurring && form.recurrenceUntil ? form.recurrenceUntil : null,
+    recurrenceStartMode: form.recurrenceStartMode,
+    recurrenceStartTime: form.recurrenceStartMode === 'fixed' ? form.recurrenceStartTime : null,
+    recurrenceStartPrayer: form.recurrenceStartMode === 'prayer' ? form.recurrenceStartPrayer : null,
+    recurrenceStartOffsetMinutes: Number(form.recurrenceStartOffsetMinutes) || 0,
+    recurrenceEndMode: form.recurrenceEndMode,
+    recurrenceEndTime: form.recurrenceEndMode === 'fixed' ? form.recurrenceEndTime : null,
+    recurrenceEndPrayer: form.recurrenceEndMode === 'prayer' ? form.recurrenceEndPrayer : null,
+    recurrenceEndOffsetMinutes: Number(form.recurrenceEndOffsetMinutes) || 0,
   };
 }
 
@@ -71,10 +121,63 @@ function ProgramForm({ initial, onSaved, onCancel }) {
   const [form, setForm] = useState(initial ? formFromProgram(initial) : EMPTY_FORM);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [posterBusy, setPosterBusy] = useState(false);
+
+  function set(patch) {
+    setForm((f) => ({ ...f, ...patch }));
+  }
+
+  function toggleDay(key) {
+    setForm((f) => ({
+      ...f,
+      recurrenceDays: f.recurrenceDays.includes(key)
+        ? f.recurrenceDays.filter((d) => d !== key)
+        : [...f.recurrenceDays, key],
+    }));
+  }
+
+  function setLink(index, patch) {
+    setForm((f) => ({
+      ...f,
+      links: f.links.map((l, i) => (i === index ? { ...l, ...patch } : l)),
+    }));
+  }
+
+  function addLink() {
+    setForm((f) => ({ ...f, links: [...f.links, { label: '', url: '' }] }));
+  }
+
+  function removeLink(index) {
+    setForm((f) => ({ ...f, links: f.links.filter((_, i) => i !== index) }));
+  }
+
+  async function onPosterChange(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setError('');
+    setPosterBusy(true);
+    try {
+      const dataUrl = await fileToPosterDataUrl(file);
+      set({ posterUrl: dataUrl });
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setPosterBusy(false);
+      e.target.value = '';
+    }
+  }
 
   async function submit(e) {
     e.preventDefault();
     setError('');
+    if (form.recurring && form.recurrenceDays.length === 0) {
+      setError('Pick at least one day for a recurring program.');
+      return;
+    }
+    if (!form.recurring && !form.startsAt) {
+      setError('A start time is required.');
+      return;
+    }
     setBusy(true);
     try {
       const payload = toPayload(form);
@@ -88,6 +191,8 @@ function ProgramForm({ initial, onSaved, onCancel }) {
     }
   }
 
+  const posterKb = form.posterUrl ? Math.round(dataUrlBytes(form.posterUrl) / 1024) : 0;
+
   return (
     <form className="card" onSubmit={submit}>
       <h2 className="card-title">{initial ? 'Edit program' : 'New program'}</h2>
@@ -97,7 +202,7 @@ function ProgramForm({ initial, onSaved, onCancel }) {
         <label>Title</label>
         <input
           value={form.title}
-          onChange={(e) => setForm({ ...form, title: e.target.value })}
+          onChange={(e) => set({ title: e.target.value })}
           required
         />
       </div>
@@ -107,36 +212,245 @@ function ProgramForm({ initial, onSaved, onCancel }) {
         <textarea
           rows={3}
           value={form.description}
-          onChange={(e) => setForm({ ...form, description: e.target.value })}
+          onChange={(e) => set({ description: e.target.value })}
         />
       </div>
 
-      <div className="row">
-        <div className="field" style={{ flex: 1 }}>
-          <label>Starts at</label>
-          <input
-            type="datetime-local"
-            value={form.startsAt}
-            onChange={(e) => setForm({ ...form, startsAt: e.target.value })}
-            required
-          />
-        </div>
-        <div className="field" style={{ flex: 1 }}>
-          <label>Ends at</label>
-          <input
-            type="datetime-local"
-            value={form.endsAt}
-            onChange={(e) => setForm({ ...form, endsAt: e.target.value })}
-          />
-        </div>
+      {/* Poster */}
+      <div className="field">
+        <label>Poster</label>
+        {form.posterUrl ? (
+          <div className="poster-preview">
+            <img src={form.posterUrl} alt="Program poster preview" />
+            <div className="poster-preview-actions">
+              <span className="muted" style={{ fontSize: '0.78rem' }}>
+                {posterKb} KB
+              </span>
+              <button
+                type="button"
+                className="btn btn-sm btn-secondary"
+                onClick={() => set({ posterUrl: '' })}
+              >
+                Remove
+              </button>
+            </div>
+          </div>
+        ) : (
+          <input type="file" accept="image/*" onChange={onPosterChange} disabled={posterBusy} />
+        )}
+        {posterBusy && <p className="muted">Processing image…</p>}
+        <p className="muted" style={{ fontSize: '0.78rem', marginTop: 4 }}>
+          Images are resized automatically before saving.
+        </p>
       </div>
+
+      {/* Links */}
+      <div className="field">
+        <label>Links</label>
+        {form.links.map((link, i) => (
+          <div className="row" key={i} style={{ marginBottom: 6 }}>
+            <input
+              style={{ flex: 1 }}
+              placeholder="Label (e.g. WhatsApp group)"
+              value={link.label}
+              onChange={(e) => setLink(i, { label: e.target.value })}
+            />
+            <input
+              style={{ flex: 2 }}
+              placeholder="https://…"
+              value={link.url}
+              onChange={(e) => setLink(i, { url: e.target.value })}
+            />
+            <button
+              type="button"
+              className="btn btn-sm btn-secondary"
+              onClick={() => removeLink(i)}
+            >
+              ✕
+            </button>
+          </div>
+        ))}
+        <button type="button" className="btn btn-sm btn-secondary" onClick={addLink}>
+          + Add link
+        </button>
+      </div>
+
+      {/* Recurrence */}
+      <label className="check-row">
+        <input
+          type="checkbox"
+          checked={form.recurring}
+          onChange={(e) => set({ recurring: e.target.checked })}
+        />
+        Repeats weekly
+      </label>
+
+      {form.recurring ? (
+        <div className="recurrence-box">
+          <div className="field">
+            <label>Days</label>
+            <div className="day-picker">
+              {WEEKDAYS.map((d) => (
+                <button
+                  type="button"
+                  key={d.key}
+                  className={`day-chip ${form.recurrenceDays.includes(d.key) ? 'active' : ''}`}
+                  onClick={() => toggleDay(d.key)}
+                >
+                  {d.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="row">
+            <div className="field" style={{ flex: 1 }}>
+              <label>Starts</label>
+              <select
+                value={form.recurrenceStartMode}
+                onChange={(e) => set({ recurrenceStartMode: e.target.value })}
+              >
+                <option value="prayer">At a prayer</option>
+                <option value="fixed">At a fixed time</option>
+              </select>
+            </div>
+            {form.recurrenceStartMode === 'prayer' ? (
+              <>
+                <div className="field" style={{ flex: 1 }}>
+                  <label>Prayer</label>
+                  <select
+                    value={form.recurrenceStartPrayer}
+                    onChange={(e) => set({ recurrenceStartPrayer: e.target.value })}
+                  >
+                    {PRAYERS.map((p) => (
+                      <option key={p.key} value={p.key}>
+                        {p.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="field" style={{ flex: 1 }}>
+                  <label>Offset (min)</label>
+                  <input
+                    type="number"
+                    value={form.recurrenceStartOffsetMinutes}
+                    onChange={(e) => set({ recurrenceStartOffsetMinutes: e.target.value })}
+                  />
+                </div>
+              </>
+            ) : (
+              <div className="field" style={{ flex: 1 }}>
+                <label>Time</label>
+                <input
+                  type="time"
+                  value={form.recurrenceStartTime}
+                  onChange={(e) => set({ recurrenceStartTime: e.target.value })}
+                />
+              </div>
+            )}
+          </div>
+
+          <div className="row">
+            <div className="field" style={{ flex: 1 }}>
+              <label>Ends</label>
+              <select
+                value={form.recurrenceEndMode}
+                onChange={(e) => set({ recurrenceEndMode: e.target.value })}
+              >
+                <option value="prayer">At a prayer</option>
+                <option value="fixed">At a fixed time</option>
+              </select>
+            </div>
+            {form.recurrenceEndMode === 'prayer' ? (
+              <>
+                <div className="field" style={{ flex: 1 }}>
+                  <label>Prayer</label>
+                  <select
+                    value={form.recurrenceEndPrayer}
+                    onChange={(e) => set({ recurrenceEndPrayer: e.target.value })}
+                  >
+                    {PRAYERS.map((p) => (
+                      <option key={p.key} value={p.key}>
+                        {p.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="field" style={{ flex: 1 }}>
+                  <label>Offset (min)</label>
+                  <input
+                    type="number"
+                    value={form.recurrenceEndOffsetMinutes}
+                    onChange={(e) => set({ recurrenceEndOffsetMinutes: e.target.value })}
+                  />
+                </div>
+              </>
+            ) : (
+              <div className="field" style={{ flex: 1 }}>
+                <label>Time</label>
+                <input
+                  type="time"
+                  value={form.recurrenceEndTime}
+                  onChange={(e) => set({ recurrenceEndTime: e.target.value })}
+                />
+              </div>
+            )}
+          </div>
+
+          <div className="field">
+            <label>Repeat until (optional)</label>
+            <input
+              type="date"
+              value={form.recurrenceUntil}
+              onChange={(e) => set({ recurrenceUntil: e.target.value })}
+            />
+          </div>
+
+          <p className="muted" style={{ fontSize: '0.8rem' }}>
+            {describeRecurrenceDays(form.recurrenceDays) || 'Pick days above'} ·{' '}
+            {describeRecurrenceTime(
+              form.recurrenceStartMode,
+              form.recurrenceStartTime,
+              form.recurrenceStartPrayer,
+              form.recurrenceStartOffsetMinutes,
+            )}{' '}
+            –{' '}
+            {describeRecurrenceTime(
+              form.recurrenceEndMode,
+              form.recurrenceEndTime,
+              form.recurrenceEndPrayer,
+              form.recurrenceEndOffsetMinutes,
+            )}
+          </p>
+        </div>
+      ) : (
+        <div className="row">
+          <div className="field" style={{ flex: 1 }}>
+            <label>Starts at</label>
+            <input
+              type="datetime-local"
+              value={form.startsAt}
+              onChange={(e) => set({ startsAt: e.target.value })}
+              required
+            />
+          </div>
+          <div className="field" style={{ flex: 1 }}>
+            <label>Ends at</label>
+            <input
+              type="datetime-local"
+              value={form.endsAt}
+              onChange={(e) => set({ endsAt: e.target.value })}
+            />
+          </div>
+        </div>
+      )}
 
       <div className="row">
         <div className="field" style={{ flex: 1 }}>
           <label>Location</label>
           <input
             value={form.location}
-            onChange={(e) => setForm({ ...form, location: e.target.value })}
+            onChange={(e) => set({ location: e.target.value })}
             placeholder="e.g. Surau main hall"
           />
         </div>
@@ -144,7 +458,7 @@ function ProgramForm({ initial, onSaved, onCancel }) {
           <label>Category</label>
           <input
             value={form.category}
-            onChange={(e) => setForm({ ...form, category: e.target.value })}
+            onChange={(e) => set({ category: e.target.value })}
           />
         </div>
       </div>
@@ -157,7 +471,7 @@ function ProgramForm({ initial, onSaved, onCancel }) {
             min="0"
             max="1440"
             value={form.checkInGraceMinutes}
-            onChange={(e) => setForm({ ...form, checkInGraceMinutes: e.target.value })}
+            onChange={(e) => set({ checkInGraceMinutes: e.target.value })}
           />
         </div>
       </div>
@@ -166,7 +480,7 @@ function ProgramForm({ initial, onSaved, onCancel }) {
         <input
           type="checkbox"
           checked={form.checkInEnabled}
-          onChange={(e) => setForm({ ...form, checkInEnabled: e.target.checked })}
+          onChange={(e) => set({ checkInEnabled: e.target.checked })}
         />
         Allow members to check in (face scan + geofence)
       </label>
@@ -175,7 +489,7 @@ function ProgramForm({ initial, onSaved, onCancel }) {
         <input
           type="checkbox"
           checked={form.isPublished}
-          onChange={(e) => setForm({ ...form, isPublished: e.target.checked })}
+          onChange={(e) => set({ isPublished: e.target.checked })}
         />
         Published (visible to members)
       </label>
@@ -184,7 +498,7 @@ function ProgramForm({ initial, onSaved, onCancel }) {
         <input
           type="checkbox"
           checked={form.useOwnLocation}
-          onChange={(e) => setForm({ ...form, useOwnLocation: e.target.checked })}
+          onChange={(e) => set({ useOwnLocation: e.target.checked })}
         />
         Held somewhere other than the surau
       </label>
@@ -201,7 +515,7 @@ function ProgramForm({ initial, onSaved, onCancel }) {
                 type="number"
                 step="any"
                 value={form.latitude}
-                onChange={(e) => setForm({ ...form, latitude: e.target.value })}
+                onChange={(e) => set({ latitude: e.target.value })}
               />
             </div>
             <div className="field" style={{ flex: 1 }}>
@@ -210,7 +524,7 @@ function ProgramForm({ initial, onSaved, onCancel }) {
                 type="number"
                 step="any"
                 value={form.longitude}
-                onChange={(e) => setForm({ ...form, longitude: e.target.value })}
+                onChange={(e) => set({ longitude: e.target.value })}
               />
             </div>
             <div className="field" style={{ flex: 1 }}>
@@ -219,7 +533,7 @@ function ProgramForm({ initial, onSaved, onCancel }) {
                 type="number"
                 min="10"
                 value={form.radiusMeters}
-                onChange={(e) => setForm({ ...form, radiusMeters: e.target.value })}
+                onChange={(e) => set({ radiusMeters: e.target.value })}
               />
             </div>
           </div>
@@ -227,7 +541,7 @@ function ProgramForm({ initial, onSaved, onCancel }) {
       )}
 
       <div className="row" style={{ marginTop: 8 }}>
-        <button className="btn" disabled={busy}>
+        <button className="btn" disabled={busy || posterBusy}>
           {busy ? 'Saving…' : initial ? 'Save changes' : 'Create program'}
         </button>
         {onCancel && (
@@ -245,6 +559,7 @@ function ProgramRoster({ program, onBack }) {
   const [rows, setRows] = useState([]);
   const [users, setUsers] = useState([]);
   const [manualId, setManualId] = useState('');
+  const [sessionDate, setSessionDate] = useState(program.session_date || '');
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [loading, setLoading] = useState(true);
@@ -272,7 +587,7 @@ function ProgramRoster({ program, onBack }) {
       return;
     }
     try {
-      await api.manualProgramCheckIn(program.id, manualId);
+      await api.manualProgramCheckIn(program.id, manualId, sessionDate || undefined);
       setNotice('Attendance recorded.');
       setManualId('');
       load();
@@ -285,7 +600,7 @@ function ProgramRoster({ program, onBack }) {
     if (!confirm(`Remove ${row.fullName}'s check-in?`)) return;
     setError('');
     try {
-      await api.undoProgramCheckIn(program.id, row.userId);
+      await api.undoProgramCheckIn(program.id, row.userId, row.sessionDate || undefined);
       load();
     } catch (err) {
       setError(err.message);
@@ -305,6 +620,16 @@ function ProgramRoster({ program, onBack }) {
           </div>
         ),
       },
+      ...(program.is_recurring
+        ? [
+            {
+              key: 'sessionDate',
+              label: 'Session',
+              sortable: true,
+              render: (r) => (r.sessionDate ? formatDate(r.sessionDate) : '—'),
+            },
+          ]
+        : []),
       {
         key: 'joinedAt',
         label: 'Joined',
@@ -347,7 +672,7 @@ function ProgramRoster({ program, onBack }) {
       },
     ],
     // `undo` closes over nothing that changes between renders.
-    [program.id],
+    [program.id, program.is_recurring],
   );
 
   const checkedIn = rows.filter((r) => r.checkedInAt).length;
@@ -360,7 +685,9 @@ function ProgramRoster({ program, onBack }) {
             {program.title}
           </h2>
           <p className="muted" style={{ margin: '4px 0 0' }}>
-            {formatDateTime(program.starts_at)}
+            {program.is_recurring
+              ? `${program.recurrence_summary || 'Recurring'} · ${formatDateTime(program.next_start)}`
+              : formatDateTime(program.starts_at)}
             {program.location ? ` · ${program.location}` : ''}
           </p>
         </div>
@@ -392,6 +719,19 @@ function ProgramRoster({ program, onBack }) {
         <p className="muted" style={{ marginBottom: 12 }}>
           Record attendance on behalf of a member (e.g. if face verification failed).
         </p>
+        {program.is_recurring && (
+          <div className="field">
+            <label>Session date</label>
+            <input
+              type="date"
+              value={sessionDate}
+              onChange={(e) => setSessionDate(e.target.value)}
+            />
+            <p className="muted" style={{ fontSize: '0.78rem', marginTop: 4 }}>
+              Leave blank to use the current or next session.
+            </p>
+          </div>
+        )}
         <div className="field">
           <label>Member</label>
           <MemberPicker
@@ -530,35 +870,57 @@ export default function ProgramsAdmin() {
       ) : (
         programs.map((p) => {
           const start = new Date(p.starts_at);
-          const isPast = new Date(p.check_in_closes_at) < new Date();
+          const isPast = !p.is_recurring && new Date(p.check_in_closes_at) < new Date();
           return (
             <div className="card" key={p.id}>
               <div className="program-card">
-                <div
-                  className="program-date"
-                  style={isPast ? { background: 'var(--slate-400)' } : undefined}
-                >
-                  <div className="day">{start.getDate()}</div>
-                  <div className="mon">
-                    {start.toLocaleDateString(undefined, { month: 'short' })}
+                {p.poster_url ? (
+                  <img className="program-poster-thumb" src={p.poster_url} alt="" />
+                ) : (
+                  <div
+                    className="program-date"
+                    style={isPast ? { background: 'var(--slate-400)' } : undefined}
+                  >
+                    <div className="day">{start.getDate()}</div>
+                    <div className="mon">
+                      {start.toLocaleDateString(undefined, { month: 'short' })}
+                    </div>
                   </div>
-                </div>
+                )}
                 <div style={{ flex: 1 }}>
                   <div className="row-between">
                     <strong>{p.title}</strong>
                     <div className="row" style={{ gap: 6 }}>
                       {!p.is_published && <span className="pill warn">Draft</span>}
+                      {p.is_recurring && <span className="pill">🔁 Recurring</span>}
                       {p.is_open && <span className="pill">Check-in open</span>}
                       {!p.check_in_enabled && <span className="pill warn">Check-in off</span>}
                     </div>
                   </div>
                   <div className="muted" style={{ margin: '4px 0' }}>
-                    {formatDateTime(p.starts_at)}
-                    {p.ends_at ? ` – ${formatDateTime(p.ends_at)}` : ''}
+                    {p.is_recurring
+                      ? `${p.recurrence_summary || 'Recurring'} · next ${formatDateTime(p.next_start)}`
+                      : formatDateTime(p.starts_at)}
+                    {!p.is_recurring && p.ends_at ? ` – ${formatDateTime(p.ends_at)}` : ''}
                     {p.location ? ` · ${p.location}` : ''}
                   </div>
                   {p.description && (
                     <p style={{ margin: '6px 0', fontSize: '0.9rem' }}>{p.description}</p>
+                  )}
+                  {p.links?.length > 0 && (
+                    <div className="row" style={{ gap: 6, flexWrap: 'wrap', margin: '6px 0' }}>
+                      {p.links.map((l, i) => (
+                        <a
+                          key={i}
+                          className="pill"
+                          href={l.url}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          🔗 {l.label}
+                        </a>
+                      ))}
+                    </div>
                   )}
                   <div className="muted" style={{ fontSize: '0.78rem' }}>
                     {p.join_count} joined · {p.checked_in_count} checked in

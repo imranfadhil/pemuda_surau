@@ -25,6 +25,37 @@ export const PRAYERS = [
 
 export const PRAYER_LABELS = Object.fromEntries(PRAYERS.map((p) => [p.key, p.label]));
 
+// Weekdays for recurring programs. Order matches the JS Date.getDay() index.
+export const WEEKDAYS = [
+  { key: 'sun', label: 'Sun' },
+  { key: 'mon', label: 'Mon' },
+  { key: 'tue', label: 'Tue' },
+  { key: 'wed', label: 'Wed' },
+  { key: 'thu', label: 'Thu' },
+  { key: 'fri', label: 'Fri' },
+  { key: 'sat', label: 'Sat' },
+];
+
+export const WEEKDAY_LABELS = Object.fromEntries(WEEKDAYS.map((d) => [d.key, d.label]));
+
+/** "Every Mon, Tue, Wed" for a program's recurrence days. */
+export function describeRecurrenceDays(days) {
+  if (!Array.isArray(days) || days.length === 0) return null;
+  const ordered = WEEKDAYS.filter((d) => days.includes(d.key)).map((d) => d.label);
+  return `Every ${ordered.join(', ')}`;
+}
+
+/** "Maghrib" / "Maghrib +15m" / "19:30" for one side of a recurrence. */
+export function describeRecurrenceTime(mode, time, prayer, offsetMinutes) {
+  if (mode === 'prayer') {
+    const label = PRAYER_LABELS[prayer] || prayer || 'prayer';
+    const off = Number(offsetMinutes) || 0;
+    if (off === 0) return label;
+    return `${label} ${off > 0 ? '+' : '−'}${Math.abs(off)}m`;
+  }
+  return time || '';
+}
+
 // ---------------------------------------------------------------------------
 // Scoring rules. Mirrors server/src/utils/scoring.js — keep the two in sync.
 // The leaderboard ranks by POINTS, so a harder activity is worth more.

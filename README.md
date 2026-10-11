@@ -21,7 +21,8 @@ statistics, rankings, and program management.
   automatically from the current time; each prayer has a check-in window (15 min before the
   adhan to 60 min after) fetched from the Aladhan API.
 - 🏆 **Dashboard & leaderboard** — stats, 7-day chart, per-prayer breakdown, rankings
-- 📅 **Programs** — upcoming activities with join/leave
+- 📅 **Programs** — upcoming activities with join/leave, posters, links and weekly recurrence
+  (e.g. every Mon–Wed, Maghrib to Isyak)
 - ⚙️ **Admin panel** — manage members, view daily attendance, manual check-in
 - 🔒 **HTTPS via Cloudflare Tunnel** — no open inbound ports, no certificate management
 - � **Installable app (PWA)** — members can add it to their phone's home screen and open it

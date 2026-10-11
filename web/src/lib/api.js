@@ -107,8 +107,14 @@ export const api = {
   leaveProgram: (id) => request(`/programs/${id}/join`, { method: 'DELETE' }),
   checkInProgram: (id, payload) => request(`/programs/${id}/check-in`, { method: 'POST', body: payload }),
   programAttendance: (id) => request(`/programs/${id}/attendance`),
-  manualProgramCheckIn: (id, userId) =>
-    request(`/programs/${id}/attendance/manual`, { method: 'POST', body: { userId } }),
-  undoProgramCheckIn: (id, userId) =>
-    request(`/programs/${id}/attendance/${userId}`, { method: 'DELETE' }),
+  manualProgramCheckIn: (id, userId, sessionDate) =>
+    request(`/programs/${id}/attendance/manual`, {
+      method: 'POST',
+      body: sessionDate ? { userId, sessionDate } : { userId },
+    }),
+  undoProgramCheckIn: (id, userId, sessionDate) =>
+    request(
+      `/programs/${id}/attendance/${userId}${sessionDate ? `?sessionDate=${sessionDate}` : ''}`,
+      { method: 'DELETE' },
+    ),
 };

@@ -23,8 +23,9 @@ function ProgramCard({ program, now, onChanged }) {
   const [result, setResult] = useState(null);
 
   const start = new Date(program.starts_at);
-  const isPast = new Date(program.check_in_closes_at) < new Date(now);
+  const isPast = !program.is_recurring && new Date(program.check_in_closes_at) < new Date(now);
   const hasEnded = program.ends_at ? new Date(program.ends_at) < new Date(now) : false;
+  const nextStart = program.next_start || program.starts_at;
 
   async function toggleJoin() {
     setBusy(true);
@@ -57,17 +58,22 @@ function ProgramCard({ program, now, onChanged }) {
   return (
     <div className="card">
       <div className="program-card">
-        <div
-          className="program-date"
-          style={isPast ? { background: 'var(--slate-400)' } : undefined}
-        >
-          <div className="day">{start.getDate()}</div>
-          <div className="mon">{start.toLocaleDateString(undefined, { month: 'short' })}</div>
-        </div>
+        {program.poster_url ? (
+          <img className="program-poster-thumb" src={program.poster_url} alt="" />
+        ) : (
+          <div
+            className="program-date"
+            style={isPast ? { background: 'var(--slate-400)' } : undefined}
+          >
+            <div className="day">{start.getDate()}</div>
+            <div className="mon">{start.toLocaleDateString(undefined, { month: 'short' })}</div>
+          </div>
+        )}
         <div style={{ flex: 1 }}>
           <div className="row-between">
             <strong>{program.title}</strong>
             <div className="row" style={{ gap: 6 }}>
+              {program.is_recurring && <span className="pill">🔁 Recurring</span>}
               {program.is_open && <span className="pill">Check-in open</span>}
               {program.checked_in_at && <span className="pill">✓ Attended</span>}
               {program.joined && !program.checked_in_at && <span className="pill">Going</span>}
@@ -75,19 +81,37 @@ function ProgramCard({ program, now, onChanged }) {
           </div>
 
           <div className="muted" style={{ margin: '4px 0' }}>
-            {formatDateTime(program.starts_at)}
-            {program.ends_at ? ` – ${formatDateTime(program.ends_at)}` : ''}
+            {program.is_recurring ? (
+              <>
+                {program.recurrence_summary || 'Recurring'} · next {formatDateTime(nextStart)}
+              </>
+            ) : (
+              <>
+                {formatDateTime(program.starts_at)}
+                {program.ends_at ? ` – ${formatDateTime(program.ends_at)}` : ''}
+              </>
+            )}
             {program.location ? ` · ${program.location}` : ''}
           </div>
 
           {!isPast && (
             <div className="muted" style={{ fontSize: '0.78rem' }}>
-              Starts {relativeTo(program.starts_at, now)}
+              Starts {relativeTo(nextStart, now)}
             </div>
           )}
 
           {program.description && (
             <p style={{ margin: '6px 0', fontSize: '0.9rem' }}>{program.description}</p>
+          )}
+
+          {program.links?.length > 0 && (
+            <div className="row" style={{ gap: 6, flexWrap: 'wrap', margin: '6px 0' }}>
+              {program.links.map((l, i) => (
+                <a key={i} className="btn btn-sm btn-secondary" href={l.url} target="_blank" rel="noreferrer">
+                  🔗 {l.label}
+                </a>
+              ))}
+            </div>
           )}
 
           <div className="muted" style={{ fontSize: '0.78rem' }}>
