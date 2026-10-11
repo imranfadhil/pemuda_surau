@@ -117,6 +117,9 @@ function ProgramCard({ program, now, onChanged }) {
             <strong>{program.title}</strong>
             <div className="row" style={{ gap: 6 }}>
               {program.is_recurring && <span className="pill">🔁 Recurring</span>}
+              {program.bonus_points > 0 && (
+                <span className="pill">🎉 +{program.bonus_points} pts</span>
+              )}
               {program.is_open && <span className="pill">Check-in open</span>}
               {program.checked_in_at && <span className="pill">✓ Attended</span>}
               {program.joined && !program.checked_in_at && <span className="pill">Going</span>}
@@ -166,6 +169,12 @@ function ProgramCard({ program, now, onChanged }) {
             <div className="alert alert-success" style={{ marginTop: 10 }}>
               Checked in to <strong>{program.title}</strong>! Confidence{' '}
               {(result.confidence * 100).toFixed(1)}%
+              {result.bonusPoints > 0 && (
+                <>
+                  {' '}
+                  · <strong>+{result.bonusPoints} bonus points</strong> 🎉
+                </>
+              )}
             </div>
           )}
 

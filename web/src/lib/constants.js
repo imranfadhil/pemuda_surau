@@ -77,6 +77,13 @@ export const QURAN_POINTS = 5;
 export const MERIT_MIN_POINTS = 1;
 export const MERIT_MAX_POINTS = 10;
 
+/**
+ * Allowed range for a program's check-in bonus. 0 disables it; an enabled bonus
+ * is between 10 and 50 points. Mirrors server/src/utils/scoring.js.
+ */
+export const PROGRAM_BONUS_MIN_POINTS = 10;
+export const PROGRAM_BONUS_MAX_POINTS = 50;
+
 // Roles and their capabilities. Mirrors server/src/utils/roles.js.
 export const ROLES = [
   { key: 'admin', label: 'Admin', description: 'Full access' },
@@ -127,6 +134,7 @@ export function can(user, capability) {
 export const CATEGORIES = [
   { key: 'overall', label: 'Overall', icon: '⭐', unit: 'pts', points: true },
   { key: 'attendance', label: 'Attendance', icon: '🕌', unit: 'pts', points: true },
+  { key: 'programs', label: 'Programs', icon: '🎉', unit: 'pts', points: true },
   { key: 'recitation', label: 'Recitation', icon: '📖', unit: 'sessions' },
   { key: 'memorization', label: 'Memorization', icon: '🧠', unit: 'sessions' },
   { key: 'merits', label: 'Merits', icon: '🏅', unit: 'pts', points: true },

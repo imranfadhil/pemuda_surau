@@ -162,6 +162,25 @@ ALTER TABLE program_attendance DROP CONSTRAINT IF EXISTS program_attendance_prog
 CREATE UNIQUE INDEX IF NOT EXISTS idx_program_attendance_session
   ON program_attendance (program_id, user_id, session_date);
 
+-- ---------------------------------------------------------------------------
+-- Program bonus points
+--
+-- An admin may attach a bonus to a program (0 = disabled, otherwise 10-50) so
+-- that turning up to a program is worth more than a single activity. The bonus
+-- is SNAPSHOT onto the attendance row at check-in time (audience: those who
+-- actually turned up), so editing the program later never rewrites points that
+-- a member has already earned. Undoing a check-in clears the snapshot.
+-- ---------------------------------------------------------------------------
+ALTER TABLE programs ADD COLUMN IF NOT EXISTS bonus_points INT NOT NULL DEFAULT 0;
+ALTER TABLE programs DROP CONSTRAINT IF EXISTS programs_bonus_points_check;
+ALTER TABLE programs ADD CONSTRAINT programs_bonus_points_check
+  CHECK (bonus_points BETWEEN 0 AND 50);
+
+ALTER TABLE program_attendance ADD COLUMN IF NOT EXISTS bonus_points INT NOT NULL DEFAULT 0;
+ALTER TABLE program_attendance DROP CONSTRAINT IF EXISTS program_attendance_bonus_points_check;
+ALTER TABLE program_attendance ADD CONSTRAINT program_attendance_bonus_points_check
+  CHECK (bonus_points BETWEEN 0 AND 50);
+
 CREATE TABLE IF NOT EXISTS settings (
   key        TEXT PRIMARY KEY,
   value      JSONB NOT NULL,

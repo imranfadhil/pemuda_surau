@@ -348,6 +348,7 @@ export default function KioskDashboard({ publicHome = false }) {
     const maxRec = maxOf((r) => r.recitation);
     const maxMem = maxOf((r) => r.memorization);
     const maxMer = maxOf((r) => r.merits);
+    const maxProg = maxOf((r) => r.programs);
     const pct = (v, max) => Number(((v / max) * 100).toFixed(1));
     return weekly.map((row) => ({
       day: new Date(row.date).toLocaleDateString(undefined, { weekday: 'short' }),
@@ -359,6 +360,7 @@ export default function KioskDashboard({ publicHome = false }) {
       recitation: pct(row.recitation, maxRec),
       memorization: pct(row.memorization, maxMem),
       merits: pct(row.merits, maxMer),
+      programs: pct(row.programs, maxProg),
     }));
   })();
 
@@ -452,6 +454,7 @@ export default function KioskDashboard({ publicHome = false }) {
                   <Bar dataKey="recitation" name="📖 Recitation" fill="#f59e0b" radius={[4, 4, 0, 0]} />
                   <Bar dataKey="memorization" name="🧠 Memorization" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
                   <Bar dataKey="merits" name="🏅 Merits" fill="#ef4444" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="programs" name="🎉 Programs" fill="#0ea5e9" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>

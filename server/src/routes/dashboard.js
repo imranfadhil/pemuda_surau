@@ -17,6 +17,7 @@ const YOUTH = youthOnlySql('u', config.dashboard.maxAge);
 const CATEGORY_COLUMNS = {
   overall: 'overall',
   attendance: 'attendance',
+  programs: 'programs',
   recitation: 'recitation',
   memorization: 'memorization',
   merits: 'merits',
@@ -133,6 +134,14 @@ router.get(
          JOIN users u ON u.id = m.user_id
          WHERE m.awarded_at >= CURRENT_DATE - INTERVAL '6 days' AND ${YOUTH}
          GROUP BY m.awarded_at::date
+       ),
+       prog AS (
+         SELECT pa.checked_in_at::date AS day, COALESCE(SUM(pa.bonus_points), 0)::int AS programs
+         FROM program_attendance pa
+         JOIN users u ON u.id = pa.user_id
+         WHERE pa.checked_in_at IS NOT NULL
+           AND pa.checked_in_at >= CURRENT_DATE - INTERVAL '6 days' AND ${YOUTH}
+         GROUP BY pa.checked_in_at::date
        )
        SELECT d.day,
               COALESCE(att.subuh, 0)        AS subuh,
@@ -143,12 +152,14 @@ router.get(
               COALESCE(att.attendance, 0)   AS attendance,
               COALESCE(rec.recitation, 0)   AS recitation,
               COALESCE(mem.memorization, 0) AS memorization,
-              COALESCE(mer.merits, 0)       AS merits
+              COALESCE(mer.merits, 0)       AS merits,
+              COALESCE(prog.programs, 0)    AS programs
        FROM days d
        LEFT JOIN att ON att.day = d.day
        LEFT JOIN rec ON rec.day = d.day
        LEFT JOIN mem ON mem.day = d.day
        LEFT JOIN mer ON mer.day = d.day
+       LEFT JOIN prog ON prog.day = d.day
        ORDER BY d.day`,
     );
 
@@ -166,6 +177,7 @@ router.get(
         recitation: row.recitation,
         memorization: row.memorization,
         merits: row.merits,
+        programs: row.programs,
       })),
     });
   }),
@@ -230,6 +242,13 @@ router.get(
          FROM merits m, period p
          WHERE p.start_date IS NULL OR m.awarded_at >= p.start_date
          GROUP BY m.user_id
+       ),
+       prog AS (
+         SELECT pa.user_id, COALESCE(SUM(pa.bonus_points), 0)::int AS programs
+         FROM program_attendance pa, period p
+         WHERE pa.checked_in_at IS NOT NULL
+           AND (p.start_date IS NULL OR pa.checked_in_at >= p.start_date)
+         GROUP BY pa.user_id
        )
        SELECT u.id, u.full_name, u.avatar_url, u.guardian_id,
               g.full_name AS guardian_name,
@@ -241,18 +260,21 @@ router.get(
               COALESCE(rec.recitation, 0) AS recitation,
               COALESCE(mem.memorization, 0) AS memorization,
               COALESCE(mer.merits, 0) AS merits,
+              COALESCE(prog.programs, 0) AS programs,
               -- Each Quran activity is worth 5 points.
               (COALESCE(rec.recitation, 0) + COALESCE(mem.memorization, 0)) * 5 AS quran_points,
               -- Overall is the sum of POINTS across every category.
               (COALESCE(att.attendance_points, 0)
                + (COALESCE(rec.recitation, 0) + COALESCE(mem.memorization, 0)) * 5
-               + COALESCE(mer.merits, 0)) AS overall
+               + COALESCE(mer.merits, 0)
+               + COALESCE(prog.programs, 0)) AS overall
        FROM users u
        LEFT JOIN users g ON g.id = u.guardian_id
        LEFT JOIN att ON att.user_id = u.id
        LEFT JOIN rec ON rec.user_id = u.id
        LEFT JOIN mem ON mem.user_id = u.id
        LEFT JOIN mer ON mer.user_id = u.id
+       LEFT JOIN prog ON prog.user_id = u.id
        WHERE u.is_active = TRUE AND ${YOUTH}
        ORDER BY ${orderColumn} DESC, attendance DESC, u.full_name ASC
        LIMIT 100`,
@@ -296,13 +318,18 @@ router.get(
        ),
        mer AS (
          SELECT COALESCE(SUM(points), 0)::int AS merits FROM merits WHERE user_id = $1
+       ),
+       prog AS (
+         SELECT COALESCE(SUM(bonus_points), 0)::int AS programs FROM program_attendance
+         WHERE user_id = $1 AND checked_in_at IS NOT NULL
        )
        SELECT att.attendance, att.days_attended, att.attendance_points,
-              rec.recitation, mem.memorization, mer.merits,
+              rec.recitation, mem.memorization, mer.merits, prog.programs,
               (att.attendance_points
                + (rec.recitation + mem.memorization) * 5
-               + mer.merits) AS overall
-       FROM att, rec, mem, mer`,
+               + mer.merits
+               + prog.programs) AS overall
+       FROM att, rec, mem, mer, prog`,
       [req.user.sub],
     );
     res.json({ scores: rows[0] });

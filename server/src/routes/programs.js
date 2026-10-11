@@ -7,6 +7,7 @@ import { asyncHandler, httpError } from '../middleware/errors.js';
 import { isValidDescriptor, findBestMatch } from '../utils/face.js';
 import { withinGeofence, isValidCoordinate, formatDistance } from '../utils/geo.js';
 import { roleHasCapability } from '../utils/roles.js';
+import { PROGRAM_BONUS_MAX_POINTS } from '../utils/scoring.js';
 import { dateInTz } from '../utils/timezone.js';
 import {
   WEEKDAYS,
@@ -48,6 +49,8 @@ const programSchema = z.object({
   radiusMeters: z.number().int().min(10).max(50000).optional().nullable(),
   checkInGraceMinutes: z.number().int().min(0).max(1440).optional(),
   checkInEnabled: z.boolean().optional(),
+  // Bonus awarded to members who check in (0 = disabled, else 10-50 points).
+  bonusPoints: z.number().int().min(0).max(PROGRAM_BONUS_MAX_POINTS).optional(),
   // Poster is a data URL (resized client-side) or an external image URL.
   posterUrl: z.string().max(1_500_000).optional().nullable(),
   links: z.array(linkSchema).max(10).optional(),
@@ -224,6 +227,7 @@ async function publicProgram(row, now = new Date()) {
     radius_meters: row.radius_meters,
     check_in_grace_minutes: row.check_in_grace_minutes,
     check_in_enabled: row.check_in_enabled,
+    bonus_points: Number(row.bonus_points ?? 0),
     poster_url: row.poster_url ?? null,
     links: Array.isArray(row.links) ? row.links : [],
     created_by: row.created_by,
@@ -376,12 +380,12 @@ router.post(
       `INSERT INTO programs
          (title, description, location, starts_at, ends_at, category, is_published, created_by,
           latitude, longitude, radius_meters, check_in_grace_minutes, check_in_enabled,
-          poster_url, links,
+          bonus_points, poster_url, links,
           recurrence_days, recurrence_until, recurrence_start_mode, recurrence_start_time,
           recurrence_start_prayer, recurrence_start_offset_minutes, recurrence_end_mode,
           recurrence_end_time, recurrence_end_prayer, recurrence_end_offset_minutes)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15,
-               $16, $17, $18, $19, $20, $21, $22, $23, $24, $25)
+               $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26)
        RETURNING *`,
       [
         d.title,
@@ -397,6 +401,7 @@ router.post(
         d.radiusMeters ?? null,
         d.checkInGraceMinutes ?? 30,
         d.checkInEnabled ?? true,
+        d.bonusPoints ?? 0,
         d.posterUrl ?? null,
         JSON.stringify(d.links ?? []),
         rec.recurrence_days,
@@ -442,6 +447,7 @@ router.put(
       radiusMeters: 'radius_meters',
       checkInGraceMinutes: 'check_in_grace_minutes',
       checkInEnabled: 'check_in_enabled',
+      bonusPoints: 'bonus_points',
       posterUrl: 'poster_url',
     };
 
@@ -652,15 +658,28 @@ router.post(
     }
 
     // A check-in implies attendance, so create the join row if it is missing.
+    // The program's bonus is SNAPSHOT onto the row now, so later edits to the
+    // program never change points already earned.
+    const bonusPoints = Number(program.bonus_points ?? 0) || 0;
     const { rows } = await query(
       `INSERT INTO program_attendance
-         (program_id, user_id, session_date, checked_in_at, method, face_score, latitude, longitude)
-       VALUES ($1, $2, $3, now(), 'face', $4, $5, $6)
+         (program_id, user_id, session_date, checked_in_at, method, face_score, latitude, longitude,
+          bonus_points)
+       VALUES ($1, $2, $3, now(), 'face', $4, $5, $6, $7)
        ON CONFLICT (program_id, user_id, session_date)
        DO UPDATE SET checked_in_at = now(), method = 'face', face_score = EXCLUDED.face_score,
-                     latitude = EXCLUDED.latitude, longitude = EXCLUDED.longitude
+                     latitude = EXCLUDED.latitude, longitude = EXCLUDED.longitude,
+                     bonus_points = EXCLUDED.bonus_points
        RETURNING *`,
-      [program.id, match.user.id, sessionDate, match.distance, latitude ?? null, longitude ?? null],
+      [
+        program.id,
+        match.user.id,
+        sessionDate,
+        match.distance,
+        latitude ?? null,
+        longitude ?? null,
+        bonusPoints,
+      ],
     );
 
     res.json({
@@ -672,6 +691,7 @@ router.post(
       distanceFromVenue: distanceFromVenue ?? null,
       accuracy: Number.isFinite(Number(accuracy)) ? Number(accuracy) : null,
       sessionDate,
+      bonusPoints,
     });
   }),
 );
@@ -695,7 +715,7 @@ router.get(
 
     const { rows } = await query(
       `SELECT pa.id, pa.user_id, pa.joined_at, pa.checked_in_at, pa.method, pa.face_score,
-              pa.session_date,
+              pa.session_date, pa.bonus_points,
               u.full_name, u.phone, u.guardian_id, g.full_name AS guardian_name,
               v.full_name AS verified_by_name
        FROM program_attendance pa
@@ -721,6 +741,7 @@ router.get(
         checkedInAt: r.checked_in_at,
         method: r.method,
         faceScore: r.face_score,
+        bonusPoints: Number(r.bonus_points ?? 0),
         verifiedByName: r.verified_by_name,
         sessionDate: r.session_date === ONE_OFF_SESSION ? null : r.session_date,
       })),
@@ -761,14 +782,16 @@ router.post(
       }
     }
 
+    const bonusPoints = Number(program.bonus_points ?? 0) || 0;
     const { rows } = await query(
       `INSERT INTO program_attendance
-         (program_id, user_id, session_date, checked_in_at, method, verified_by)
-       VALUES ($1, $2, $3, now(), 'manual', $4)
+         (program_id, user_id, session_date, checked_in_at, method, verified_by, bonus_points)
+       VALUES ($1, $2, $3, now(), 'manual', $4, $5)
        ON CONFLICT (program_id, user_id, session_date)
-       DO UPDATE SET checked_in_at = now(), method = 'manual', verified_by = EXCLUDED.verified_by
+       DO UPDATE SET checked_in_at = now(), method = 'manual', verified_by = EXCLUDED.verified_by,
+                     bonus_points = EXCLUDED.bonus_points
        RETURNING *`,
-      [req.params.id, parsed.data.userId, sessionDate, req.user.sub],
+      [req.params.id, parsed.data.userId, sessionDate, req.user.sub, bonusPoints],
     );
     res.json({ ok: true, attendance: rows[0] });
   }),
@@ -784,7 +807,7 @@ router.delete(
     const { rowCount } = await query(
       `UPDATE program_attendance
        SET checked_in_at = NULL, face_score = NULL, latitude = NULL, longitude = NULL,
-           verified_by = NULL, method = 'face'
+           verified_by = NULL, method = 'face', bonus_points = 0
        WHERE program_id = $1 AND user_id = $2 AND session_date = $3`,
       [req.params.id, req.params.userId, sessionDate],
     );

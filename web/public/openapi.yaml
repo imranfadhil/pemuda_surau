@@ -188,6 +188,16 @@ components:
           type: boolean
           default: true
           description: When false, members cannot self check-in; staff can still record manually.
+        bonusPoints:
+          type: integer
+          minimum: 0
+          maximum: 50
+          default: 0
+          description: |
+            Bonus points awarded to each member who checks in. 0 disables the
+            bonus; an enabled bonus is 10-50 points. The value is snapshotted
+            onto each attendance row at check-in, so editing it later does not
+            change points already earned.
         posterUrl:
           type: string
           nullable: true
@@ -255,6 +265,9 @@ components:
         radius_meters: { type: integer, nullable: true }
         check_in_grace_minutes: { type: integer }
         check_in_enabled: { type: boolean }
+        bonus_points:
+          type: integer
+          description: Bonus points awarded to members who check in (0 = disabled, else 10-50).
         poster_url: { type: string, nullable: true }
         links:
           type: array
@@ -319,6 +332,11 @@ components:
         checkedInAt: { type: string, format: date-time, nullable: true }
         method: { type: string, enum: [face, manual] }
         faceScore: { type: number, nullable: true }
+        bonusPoints:
+          type: integer
+          description: |
+            Bonus points snapshot onto this row at check-in (0 when the program
+            had no bonus at the time). Cleared when the check-in is undone.
         sessionDate:
           type: string
           format: date
@@ -1318,7 +1336,7 @@ paths:
           in: query
           schema:
             type: string
-            enum: [overall, attendance, recitation, memorization, merits]
+            enum: [overall, attendance, programs, recitation, memorization, merits]
             default: overall
       responses:
         '200':

@@ -22,7 +22,8 @@ statistics, rankings, and program management.
   adhan to 60 min after) fetched from the Aladhan API.
 - 🏆 **Dashboard & leaderboard** — stats, 7-day chart, per-prayer breakdown, rankings
 - 📅 **Programs** — upcoming activities with join/leave, posters, links and weekly recurrence
-  (e.g. every Mon–Wed, Maghrib to Isyak)
+  (e.g. every Mon–Wed, Maghrib to Isyak). Admins can opt to award **bonus points** (10–50)
+  to members who check in.
 - 🔔 **Reminders** — a background scheduler reminds members before each adhan and before
   programs they joined, over Telegram, Web Push and an in-app notification bell
 - ⚙️ **Admin panel** — manage members, view daily attendance, manual check-in
@@ -42,9 +43,14 @@ counts are still shown alongside (e.g. "12 prayers", "3 recitations").
 | Prayer check-in — Zuhur / Asar / Maghrib / Isyak | **5** |
 | Quran activity (recitation or memorization) | **5** |
 | Merit award | **1–10** (chosen by the teacher/AJK) |
+| Program check-in bonus | **0** (off) or **10–50** (set per program) |
 
 Subuh is worth the most because it is the hardest to attend. **Overall** is the sum of points
 across every category.
+
+A program's bonus is **snapshotted onto each attendance row at check-in**, so editing the
+program later never rewrites points a member has already earned (undoing the check-in clears
+the snapshot). Set it in the admin program form ("Award bonus points for checking in").
 
 The rules live in `server/src/utils/scoring.js` and are mirrored in
 `web/src/lib/constants.js` for display. The leaderboard SQL in `routes/dashboard.js`

@@ -10,6 +10,8 @@ import {
   PRAYERS,
   describeRecurrenceDays,
   describeRecurrenceTime,
+  PROGRAM_BONUS_MIN_POINTS,
+  PROGRAM_BONUS_MAX_POINTS,
 } from '../lib/constants.js';
 import { fileToPosterDataUrl, dataUrlBytes } from '../lib/poster.js';
 
@@ -37,6 +39,8 @@ const EMPTY_FORM = {
   radiusMeters: '',
   checkInGraceMinutes: 30,
   checkInEnabled: true,
+  bonusEnabled: false,
+  bonusPoints: PROGRAM_BONUS_MIN_POINTS,
   posterUrl: '',
   links: [],
   recurring: false,
@@ -67,6 +71,8 @@ function formFromProgram(p) {
     radiusMeters: p.radius_meters ?? '',
     checkInGraceMinutes: p.check_in_grace_minutes ?? 30,
     checkInEnabled: p.check_in_enabled,
+    bonusEnabled: Number(p.bonus_points ?? 0) > 0,
+    bonusPoints: Number(p.bonus_points ?? 0) || PROGRAM_BONUS_MIN_POINTS,
     posterUrl: p.poster_url || '',
     links: Array.isArray(p.links) ? p.links : [],
     recurring: Boolean(p.is_recurring),
@@ -102,6 +108,7 @@ function toPayload(form) {
       form.useOwnLocation && form.radiusMeters !== '' ? Number(form.radiusMeters) : null,
     checkInGraceMinutes: Number(form.checkInGraceMinutes) || 0,
     checkInEnabled: form.checkInEnabled,
+    bonusPoints: form.bonusEnabled ? Number(form.bonusPoints) || 0 : 0,
     posterUrl: form.posterUrl || null,
     links: form.links.filter((l) => l.label && l.url),
     recurrenceDays: recurring ? form.recurrenceDays : [],
@@ -488,6 +495,32 @@ function ProgramForm({ initial, onSaved, onCancel }) {
       <label className="check-row">
         <input
           type="checkbox"
+          checked={form.bonusEnabled}
+          onChange={(e) => set({ bonusEnabled: e.target.checked })}
+        />
+        Award bonus points for checking in
+      </label>
+
+      {form.bonusEnabled && (
+        <div className="field">
+          <label>Bonus points ({PROGRAM_BONUS_MIN_POINTS}\u2013{PROGRAM_BONUS_MAX_POINTS})</label>
+          <input
+            type="number"
+            min={PROGRAM_BONUS_MIN_POINTS}
+            max={PROGRAM_BONUS_MAX_POINTS}
+            value={form.bonusPoints}
+            onChange={(e) => set({ bonusPoints: e.target.value })}
+          />
+          <p className="muted" style={{ fontSize: '0.78rem', marginTop: 4 }}>
+            Awarded to each member who checks in. Already-recorded check-ins are not
+            affected by later changes.
+          </p>
+        </div>
+      )}
+
+      <label className="check-row">
+        <input
+          type="checkbox"
           checked={form.isPublished}
           onChange={(e) => set({ isPublished: e.target.checked })}
         />
@@ -656,6 +689,18 @@ function ProgramRoster({ program, onBack }) {
             <span className="pill">
               {r.method === 'manual' ? `manual${r.verifiedByName ? ` · ${r.verifiedByName}` : ''}` : 'face'}
             </span>
+          ) : (
+            <span className="muted">—</span>
+          ),
+      },
+      {
+        key: 'bonusPoints',
+        label: 'Bonus',
+        sortable: true,
+        align: 'right',
+        render: (r) =>
+          r.checkedInAt && r.bonusPoints > 0 ? (
+            <span className="pill">🎉 +{r.bonusPoints} pts</span>
           ) : (
             <span className="muted">—</span>
           ),

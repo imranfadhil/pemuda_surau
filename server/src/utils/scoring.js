@@ -31,6 +31,14 @@ export const QURAN_POINTS = 5;
 export const MERIT_MIN_POINTS = 1;
 export const MERIT_MAX_POINTS = 10;
 
+/**
+ * Allowed range for a program's check-in bonus. 0 means the bonus is disabled;
+ * any enabled bonus is between 10 and 50 points (see schema.sql). The bonus is
+ * fastened to the attendance row at check-in, so it is always a whole number.
+ */
+export const PROGRAM_BONUS_MIN_POINTS = 10;
+export const PROGRAM_BONUS_MAX_POINTS = 50;
+
 /** Points for one prayer, defaulting to the standard daytime value. */
 export function prayerPoints(prayer) {
   return PRAYER_POINTS[prayer] ?? PRAYER_POINTS.zuhur;
