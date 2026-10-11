@@ -16,11 +16,47 @@ function relativeTo(iso, now) {
   return diff >= 0 ? `in ${span}` : `${span} ago`;
 }
 
+/**
+ * Full-screen viewer for a program poster. The card thumbnail is far too small
+ * to read the details printed on a poster, so tapping it opens the image at a
+ * readable size. Closes on backdrop click, the ✕ button, or Escape.
+ */
+function PosterLightbox({ src, alt, onClose }) {
+  useEffect(() => {
+    function onKey(e) {
+      if (e.key === 'Escape') onClose();
+    }
+    document.addEventListener('keydown', onKey);
+    // Lock background scroll while the overlay is open.
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.body.style.overflow = prev;
+    };
+  }, [onClose]);
+
+  return (
+    <div className="poster-lightbox" onClick={onClose} role="dialog" aria-modal="true" aria-label={alt}>
+      <button className="poster-lightbox-close" onClick={onClose} aria-label="Close">
+        ✕
+      </button>
+      <img
+        className="poster-lightbox-img"
+        src={src}
+        alt={alt}
+        onClick={(e) => e.stopPropagation()}
+      />
+    </div>
+  );
+}
+
 function ProgramCard({ program, now, onChanged }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [checkingIn, setCheckingIn] = useState(false);
   const [result, setResult] = useState(null);
+  const [posterOpen, setPosterOpen] = useState(false);
 
   const start = new Date(program.starts_at);
   const isPast = !program.is_recurring && new Date(program.check_in_closes_at) < new Date(now);
@@ -59,7 +95,14 @@ function ProgramCard({ program, now, onChanged }) {
     <div className="card">
       <div className="program-card">
         {program.poster_url ? (
-          <img className="program-poster-thumb" src={program.poster_url} alt="" />
+          <button
+            type="button"
+            className="program-poster-btn"
+            onClick={() => setPosterOpen(true)}
+            aria-label={`View poster for ${program.title}`}
+          >
+            <img className="program-poster-thumb" src={program.poster_url} alt="" />
+          </button>
         ) : (
           <div
             className="program-date"
@@ -150,6 +193,13 @@ function ProgramCard({ program, now, onChanged }) {
           </div>
         </div>
       </div>
+      {posterOpen && (
+        <PosterLightbox
+          src={program.poster_url}
+          alt={`${program.title} poster`}
+          onClose={() => setPosterOpen(false)}
+        />
+      )}
     </div>
   );
 }

@@ -369,27 +369,25 @@ textarea:focus {
 }
 
 /* Icon-only button, sized to sit inline with the top-bar controls.
-   Overrides .btn-ghost's hard white border with a soft translucent chip so it
-   blends into the teal topbar instead of looking like an outlined box. */
+   Overrides .btn-ghost's hard white border. Kept borderless and background-free
+   so it reads as a plain glyph; flex:0 0 auto stops the flex row from squashing
+   it into an oval on narrow (phone) screens. */
 .community-icon-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  flex: 0 0 auto;
   line-height: 1;
-  width: 34px;
-  height: 34px;
-  padding: 0;
+  padding: 4px;
   border: none;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.12);
+  background: none;
   text-decoration: none;
   /* WhatsApp brand green so the glyph reads instantly against the teal topbar. */
   color: #25d366;
-  transition: background 0.15s ease, color 0.15s ease;
+  transition: color 0.15s ease;
 }
 
 .community-icon-btn:hover {
-  background: rgba(255, 255, 255, 0.22);
   color: #1ebe5a;
 }
 
@@ -936,6 +934,69 @@ textarea:focus {
   border-radius: 12px;
   flex-shrink: 0;
   background: var(--slate-200, #e2e8f0);
+}
+
+/* The thumbnail is a button so the poster can be opened full-size. */
+.program-poster-btn {
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: zoom-in;
+  flex-shrink: 0;
+  line-height: 0;
+  border-radius: 12px;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.program-poster-btn:hover {
+  transform: scale(1.03);
+  box-shadow: var(--shadow-sm);
+}
+
+.program-poster-btn:focus-visible {
+  outline: 2px solid var(--teal-700);
+  outline-offset: 2px;
+}
+
+/* Full-screen poster viewer. */
+.poster-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(0, 0, 0, 0.82);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  cursor: zoom-out;
+}
+
+.poster-lightbox-img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  border-radius: 8px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+  cursor: default;
+}
+
+.poster-lightbox-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  width: 40px;
+  height: 40px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.15);
+  color: white;
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.poster-lightbox-close:hover {
+  background: rgba(255, 255, 255, 0.3);
 }
 
 /* Poster preview inside the admin form. */
@@ -1969,4 +2030,19 @@ textarea:focus {
 .notif-prefs .btn-sm {
   margin-top: 8px;
   width: 100%;
+}
+
+/* On phones the bell sits left of the user name + Logout, so a right-anchored
+   panel overflows the left edge of the viewport. Pin it to the viewport
+   instead so the whole feed and prefs stay reachable. */
+@media (max-width: 640px) {
+  .notif-panel {
+    position: fixed;
+    top: 74px;
+    left: 12px;
+    right: 12px;
+    width: auto;
+    max-height: calc(100vh - 160px);
+    max-height: calc(100dvh - 160px);
+  }
 }
