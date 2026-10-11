@@ -139,30 +139,95 @@ textarea:focus {
 }
 
 /* ---- Bottom nav ---- */
-.bottom-nav {
+.bottom-nav-wrap {
   position: fixed;
   bottom: 0;
   left: 0;
   right: 0;
+  z-index: 20;
   background: white;
   border-top: 1px solid var(--slate-200);
+}
+
+.bottom-nav {
+  background: white;
   display: flex;
   /* flex-start (not space-around): with overflow-x, space-around makes the
      overflowing left edge unreachable. Items grow to fill when they fit. */
   justify-content: flex-start;
   padding: 8px 4px calc(8px + env(safe-area-inset-bottom));
-  z-index: 20;
-  /* Admins get 7 items, which overflows a phone's width. Allow horizontal
-     scrolling so every item (including Admin) stays reachable, and hide the
-     scrollbar so it still looks like a nav bar. */
+  /* Members get 7 items and admins 8, which overflows a phone's width. Allow
+     horizontal scrolling so every item (including Admin) stays reachable, and
+     hide the scrollbar so it still looks like a nav bar. */
   overflow-x: auto;
   overflow-y: hidden;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
+  /* Extra room at each end so the edge-fade never sits on top of a label. */
+  scroll-padding-inline: 28px;
 }
 
 .bottom-nav::-webkit-scrollbar {
   display: none;
+}
+
+/* Edge fades + chevron cue: pinned over the scroller and only shown on the
+   side(s) that actually have off-screen items. Without this, phone users
+   can't tell that more nav buttons are hidden to the left/right. */
+.bottom-nav-fade {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 40px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  display: flex;
+  align-items: center;
+  color: var(--slate-400);
+}
+
+.bottom-nav-fade.left {
+  left: 0;
+  background: linear-gradient(to left, rgba(255, 255, 255, 0), #fff 62%);
+}
+
+.bottom-nav-fade.right {
+  right: 0;
+  justify-content: flex-end;
+  padding-right: 2px;
+  background: linear-gradient(to right, rgba(255, 255, 255, 0), #fff 62%);
+}
+
+.bottom-nav-wrap[data-scroll-left='true'] .bottom-nav-fade.left,
+.bottom-nav-wrap[data-scroll-right='true'] .bottom-nav-fade.right {
+  opacity: 1;
+}
+
+/* Bouncing chevron draws the eye to the hidden items. */
+.bottom-nav-chevron {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--slate-400);
+  animation: nav-nudge 1.6s ease-in-out infinite;
+}
+
+@keyframes nav-nudge {
+  0%,
+  100% {
+    transform: translateX(0);
+    opacity: 0.55;
+  }
+  50% {
+    transform: translateX(4px);
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bottom-nav-chevron {
+    animation: none;
+  }
 }
 
 .bottom-nav a {
