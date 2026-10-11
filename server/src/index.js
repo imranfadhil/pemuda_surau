@@ -8,6 +8,8 @@ import { config } from './config.js';
 import { pool } from './db.js';
 import { notFound, errorHandler } from './middleware/errors.js';
 import { startTelegramPolling, stopTelegramPolling } from './utils/telegramPolling.js';
+import { initWebPush } from './utils/notify.js';
+import { startScheduler, stopScheduler } from './utils/scheduler.js';
 import authRoutes from './routes/auth.js';
 import userRoutes from './routes/users.js';
 import attendanceRoutes from './routes/attendance.js';
@@ -15,6 +17,7 @@ import dashboardRoutes from './routes/dashboard.js';
 import programRoutes from './routes/programs.js';
 import telegramRoutes from './routes/telegram.js';
 import activityRoutes from './routes/activity.js';
+import notificationRoutes from './routes/notifications.js';
 
 const app = express();
 
@@ -50,6 +53,7 @@ app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/programs', programRoutes);
 app.use('/api/telegram', telegramRoutes);
 app.use('/api/activity', activityRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 app.use(notFound);
 app.use(errorHandler);
@@ -61,10 +65,16 @@ const server = app.listen(config.port, () => {
   startTelegramPolling().catch((err) =>
     console.error('[telegram:polling] failed to start', err.message),
   );
+
+  // Prayer + program reminders over Telegram/Web Push, plus the in-app feed.
+  initWebPush();
+  if (config.notifications.enabled) startScheduler();
+  else console.log('[scheduler] notifications disabled (NOTIFICATIONS_ENABLED=false)');
 });
 
 async function shutdown(signal) {
   console.log(`[api] ${signal} received, shutting down`);
+  stopScheduler();
   stopTelegramPolling();
   server.close(async () => {
     await pool.end();

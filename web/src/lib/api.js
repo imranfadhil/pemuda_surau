@@ -117,4 +117,16 @@ export const api = {
       `/programs/${id}/attendance/${userId}${sessionDate ? `?sessionDate=${sessionDate}` : ''}`,
       { method: 'DELETE' },
     ),
+
+  // Notifications (in-app feed, prefs, Web Push)
+  notifications: (limit = 30) => request(`/notifications?limit=${limit}`),
+  markNotificationsRead: (ids) => request('/notifications/read', { method: 'POST', body: { ids } }),
+  notificationPrefs: () => request('/notifications/prefs'),
+  updateNotificationPrefs: (prefs) =>
+    request('/notifications/prefs', { method: 'PUT', body: prefs }),
+  pushStatus: () => request('/notifications/push/status'),
+  pushSubscribe: (subscription) =>
+    request('/notifications/push/subscribe', { method: 'POST', body: subscription }),
+  pushUnsubscribe: (endpoint) =>
+    request('/notifications/push/unsubscribe', { method: 'POST', body: { endpoint } }),
 };

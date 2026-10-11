@@ -23,6 +23,8 @@ statistics, rankings, and program management.
 - 🏆 **Dashboard & leaderboard** — stats, 7-day chart, per-prayer breakdown, rankings
 - 📅 **Programs** — upcoming activities with join/leave, posters, links and weekly recurrence
   (e.g. every Mon–Wed, Maghrib to Isyak)
+- 🔔 **Reminders** — a background scheduler reminds members before each adhan and before
+  programs they joined, over Telegram, Web Push and an in-app notification bell
 - ⚙️ **Admin panel** — manage members, view daily attendance, manual check-in
 - 🔒 **HTTPS via Cloudflare Tunnel** — no open inbound ports, no certificate management
 - � **Installable app (PWA)** — members can add it to their phone's home screen and open it
@@ -336,6 +338,48 @@ dev mode is unaffected.
   `no-cache` so app updates are picked up.
 - If you change the app shell, bump `CACHE` in `sw.js` to evict the old entries.
 
+## Notifications (prayer + program reminders)
+
+A lightweight in-process scheduler (`server/src/utils/scheduler.js`) ticks every minute and
+reminds members:
+
+| What | Who | When |
+| --- | --- | --- |
+| Prayer reminder | Every active member (not dependents — they have no login) | `NOTIFY_PRAYER_LEAD_MINUTES` (default 15) before the adhan |
+| Program reminder | Members who **joined** the program | `NOTIFY_PROGRAM_LEAD_HOURS` (default 24) before the next occurrence (recurring included) |
+
+Members who **already checked in** for that prayer are skipped — no nagging after the fact.
+
+**Channels.** Every reminder is stored in the `notifications` table, which is both the
+in-app feed (the 🔔 bell in the top bar) *and* the delivery log:
+
+- **In-app feed** — always on; rows are pruned after `NOTIFY_RETENTION_DAYS` (default 30).
+- **Telegram** — sent to members who linked their account; toggled per member.
+- **Web Push** — sent to devices that enabled it from the bell; needs VAPID keys.
+
+Deduping is a database guarantee: rows are inserted with
+`ON CONFLICT (user_id, dedupe_key) DO NOTHING`, so a restart, a slow tick or a double-tick
+can never send the same reminder twice. Failed Telegram/push sends are retried on later ticks
+for `NOTIFY_RETRY_WINDOW_HOURS` (default 2), then given up (the in-app row remains).
+
+**Web Push setup** (optional — Telegram + in-app work without it):
+
+```bash
+npx web-push generate-vapid-keys
+# paste the two keys into .env as WEBPUSH_PUBLIC_KEY / WEBPUSH_PRIVATE_KEY
+```
+
+Members enable push from the 🔔 bell → "Enable push notifications". On **iPhone**, Web Push
+only works for the **installed** (Add to Home Screen) PWA on iOS 16.4+; the bell shows
+install instructions instead of a broken button otherwise. Dead subscriptions (404/410 from
+the push service) are deleted automatically.
+
+Per-member preferences (what to remind about + which channels) live in `notification_prefs`
+and are edited from the bell panel. Defaults are all-on with no row present, so existing
+members are opted in and can turn things off.
+
+Disable everything with `NOTIFICATIONS_ENABLED=false`.
+
 ## Quran logging rules
 
 | Who | Geofence | Cooldown | Face scan |
@@ -536,7 +580,6 @@ Auth column: **–** = public, **user** = any logged-in member, **cap** = requir
 ## Roadmap ideas
 
 - Streaks and badges
-- Push notifications / reminders before each prayer
 - QR fallback for members without a camera
 - Export reports to CSV/PDF
 - Multi-surau support

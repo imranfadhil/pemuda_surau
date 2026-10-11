@@ -74,6 +74,31 @@ export const config = {
   },
   // How OTP codes are delivered: telegram | sms | console
   otpChannel: process.env.OTP_CHANNEL || 'console',
+  // Push-style notifications: prayer reminders + upcoming-program reminders,
+  // delivered over Telegram and Web Push, plus an in-app feed.
+  notifications: {
+    enabled: (process.env.NOTIFICATIONS_ENABLED || 'true') !== 'false',
+    // Scheduler tick interval. Every minute is plenty: the earliest useful
+    // reminder (prayer -15 min) dwarfs the tick, and dedupe makes late ticks safe.
+    tickMs: Number(process.env.NOTIFICATIONS_TICK_MS || 60_000),
+    // Remind this many minutes BEFORE the adhan (matches the check-in window).
+    prayerLeadMinutes: Number(process.env.NOTIFY_PRAYER_LEAD_MINUTES || 15),
+    // Remind joined members this many hours before a program starts.
+    programLeadHours: Number(process.env.NOTIFY_PROGRAM_LEAD_HOURS || 24),
+    // How long an undeliverable notification keeps being retried before we
+    // give up (it stays visible in the in-app feed regardless).
+    retryWindowHours: Number(process.env.NOTIFY_RETRY_WINDOW_HOURS || 2),
+    // In-app feed rows older than this are pruned on each tick.
+    retentionDays: Number(process.env.NOTIFY_RETENTION_DAYS || 30),
+  },
+  // Web Push VAPID credentials. Generate with:
+  //   npx web-push generate-vapid-keys
+  // Empty keys = Web Push silently disabled (Telegram + in-app still work).
+  webpush: {
+    publicKey: process.env.WEBPUSH_PUBLIC_KEY || '',
+    privateKey: process.env.WEBPUSH_PRIVATE_KEY || '',
+    subject: process.env.WEBPUSH_SUBJECT || 'mailto:admin@surau.local',
+  },
   // Public base URL of the app (used for Telegram webhook registration)
   publicUrl: process.env.PUBLIC_URL || '',
   adminPhones: (process.env.ADMIN_PHONES || '')

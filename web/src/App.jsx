@@ -3,6 +3,7 @@ import { Routes, Route, Navigate, NavLink, Link, useLocation } from 'react-route
 import { useAuth } from './lib/auth.jsx';
 import CommunityLink from './components/CommunityLink.jsx';
 import InstallPrompt from './components/InstallPrompt.jsx';
+import NotificationBell from './components/NotificationBell.jsx';
 import { TourProvider } from './components/Tour.jsx';
 import LoginPage from './pages/LoginPage.jsx';
 import RegisterPage from './pages/RegisterPage.jsx';
@@ -111,6 +112,7 @@ function TopBar() {
         <CommunityLink variant="icon" />
         {user ? (
           <>
+            <NotificationBell />
             <span>{user.fullName}</span>
             <button className="btn-ghost" onClick={logout}>
               Log out

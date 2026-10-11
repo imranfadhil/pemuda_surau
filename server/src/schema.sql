@@ -273,3 +273,56 @@ ALTER TABLE users DROP COLUMN IF EXISTS age;
 -- this is the optional co-guardian. Both are treated as full guardians.
 ALTER TABLE users ADD COLUMN IF NOT EXISTS co_guardian_id UUID REFERENCES users(id) ON DELETE SET NULL;
 CREATE INDEX IF NOT EXISTS idx_users_co_guardian ON users (co_guardian_id) WHERE co_guardian_id IS NOT NULL;
+
+-- ---------------------------------------------------------------------------
+-- Notifications: prayer reminders, program reminders, in-app feed, Web Push.
+--
+-- One `notifications` row per user per event (deduped by `dedupe_key`) serves
+-- BOTH as the in-app notification feed AND as the delivery log: the scheduler
+-- inserts the row first (ON CONFLICT DO NOTHING), then pushes it out over
+-- Telegram and Web Push, tracking progress in sent_telegram / sent_push so a
+-- failed send is retried on a later tick and a restart never double-sends.
+-- ---------------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS notifications (
+  id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id        UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  kind           TEXT NOT NULL CHECK (kind IN ('prayer', 'program')),
+  title          TEXT NOT NULL,
+  body           TEXT,
+  link           TEXT,
+  -- Stable per user+event, e.g. 'prayer:2026-10-11:zuhur' or
+  -- 'program:<id>:2026-10-12'. The UNIQUE constraint IS the idempotency.
+  dedupe_key     TEXT NOT NULL,
+  -- Delivery handled = true (sent, or nothing to send to). Ageing out of the
+  -- pending window also ends delivery; the row remains as the in-app feed.
+  sent_telegram  BOOLEAN NOT NULL DEFAULT FALSE,
+  sent_push      BOOLEAN NOT NULL DEFAULT FALSE,
+  read_at        TIMESTAMPTZ,
+  created_at     TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_notifications_dedupe
+  ON notifications (user_id, dedupe_key);
+CREATE INDEX IF NOT EXISTS idx_notifications_user
+  ON notifications (user_id, created_at DESC);
+
+-- Per-member delivery preferences. Absence of a row = all defaults (on).
+CREATE TABLE IF NOT EXISTS notification_prefs (
+  user_id           UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  prayer_reminders  BOOLEAN NOT NULL DEFAULT TRUE,
+  program_reminders BOOLEAN NOT NULL DEFAULT TRUE,
+  telegram_enabled  BOOLEAN NOT NULL DEFAULT TRUE,
+  push_enabled      BOOLEAN NOT NULL DEFAULT TRUE,
+  updated_at        TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Web Push subscriptions, one row per browser/device.
+CREATE TABLE IF NOT EXISTS push_subscriptions (
+  id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id    UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  endpoint   TEXT NOT NULL UNIQUE,
+  p256dh     TEXT NOT NULL,
+  auth       TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_push_subs_user ON push_subscriptions (user_id);

@@ -41,6 +41,8 @@ tags:
     description: Surau programs and sign-ups
   - name: Telegram
     description: Telegram account linking (used for free OTP delivery)
+  - name: Notifications
+    description: In-app reminder feed, delivery preferences and Web Push subscriptions
   - name: System
     description: Health and diagnostics
 
@@ -326,6 +328,33 @@ components:
           type: string
           nullable: true
           description: Staff member who recorded a manual check-in.
+
+    Notification:
+      type: object
+      description: |
+        One in-app reminder. The same row is the delivery log for the Telegram
+        and Web Push channels, so the feed is the full history regardless of
+        which channels a member uses.
+      properties:
+        id: { type: string, format: uuid }
+        kind: { type: string, enum: [prayer, program] }
+        title: { type: string, example: 'Zuhur in 15 minutes' }
+        body: { type: string, nullable: true }
+        link:
+          type: string
+          nullable: true
+          description: In-app path to open on click (e.g. `/check-in`).
+        readAt: { type: string, format: date-time, nullable: true }
+        createdAt: { type: string, format: date-time }
+
+    NotificationPrefs:
+      type: object
+      description: Per-member delivery preferences. Defaults (no row) are all true.
+      properties:
+        prayerReminders: { type: boolean }
+        programReminders: { type: boolean }
+        telegramEnabled: { type: boolean }
+        pushEnabled: { type: boolean }
 
   parameters:
     Id:
@@ -1708,6 +1737,144 @@ paths:
                   configured: { type: boolean }
                   botUsername: { type: string, nullable: true }
                   linkedUsers: { type: integer }
+
+  # ---------------------------------------------------------- Notifications
+  /notifications:
+    get:
+      tags: [Notifications]
+      summary: In-app notification feed
+      description: |
+        Recent reminders for the caller (prayer + program), newest first, with
+        the unread count. Fed by the same scheduler that sends Telegram/push
+        messages, so the feed is complete even on channels the member doesn't use.
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, default: 30, maximum: 100 }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  unread: { type: integer }
+                  notifications:
+                    type: array
+                    items: { $ref: '#/components/schemas/Notification' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /notifications/read:
+    post:
+      tags: [Notifications]
+      summary: Mark notifications as read
+      description: Without `ids`, marks ALL of the caller's notifications as read.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                ids:
+                  type: array
+                  items: { type: string, format: uuid }
+      responses:
+        '200': { description: Done }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /notifications/prefs:
+    get:
+      tags: [Notifications]
+      summary: Delivery preferences
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/NotificationPrefs' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    put:
+      tags: [Notifications]
+      summary: Update delivery preferences
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                prayerReminders: { type: boolean }
+                programReminders: { type: boolean }
+                telegramEnabled: { type: boolean }
+                pushEnabled: { type: boolean }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/NotificationPrefs' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /notifications/push/status:
+    get:
+      tags: [Notifications]
+      summary: Web Push status for this server + device count
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  configured: { type: boolean, description: VAPID keys present }
+                  publicKey: { type: string, nullable: true }
+                  devices: { type: integer, description: Registered devices for this user }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /notifications/push/subscribe:
+    post:
+      tags: [Notifications]
+      summary: Register this device's Web Push subscription
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [endpoint, keys]
+              properties:
+                endpoint: { type: string, format: uri }
+                keys:
+                  type: object
+                  required: [p256dh, auth]
+                  properties:
+                    p256dh: { type: string }
+                    auth: { type: string }
+      responses:
+        '200': { description: Subscribed }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '503': { description: Web Push not configured on this server }
+
+  /notifications/push/unsubscribe:
+    post:
+      tags: [Notifications]
+      summary: Remove this device's push subscription
+      description: Omit `endpoint` to remove ALL of the caller's subscriptions.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                endpoint: { type: string, format: uri }
+      responses:
+        '200': { description: Unsubscribed }
+        '401': { $ref: '#/components/responses/Unauthorized' }
 
   # ---------------------------------------------------------------- System
   /health:
