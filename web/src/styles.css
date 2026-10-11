@@ -368,12 +368,33 @@ textarea:focus {
   background: #1ebe5a;
 }
 
-/* Icon-only button, sized to sit inline with the top-bar controls. */
+/* Icon-only button, sized to sit inline with the top-bar controls.
+   Overrides .btn-ghost's hard white border with a soft translucent chip so it
+   blends into the teal topbar instead of looking like an outlined box. */
 .community-icon-btn {
-  font-size: 1rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   line-height: 1;
-  padding: 6px 10px;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.12);
   text-decoration: none;
+  /* WhatsApp brand green so the glyph reads instantly against the teal topbar. */
+  color: #25d366;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.community-icon-btn:hover {
+  background: rgba(255, 255, 255, 0.22);
+  color: #1ebe5a;
+}
+
+.community-icon-btn svg {
+  display: block;
 }
 
 .community-card-head {
