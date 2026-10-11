@@ -503,7 +503,7 @@ function ProgramForm({ initial, onSaved, onCancel }) {
 
       {form.bonusEnabled && (
         <div className="field">
-          <label>Bonus points ({PROGRAM_BONUS_MIN_POINTS}\u2013{PROGRAM_BONUS_MAX_POINTS})</label>
+          <label>Bonus points ({PROGRAM_BONUS_MIN_POINTS}-{PROGRAM_BONUS_MAX_POINTS})</label>
           <input
             type="number"
             min={PROGRAM_BONUS_MIN_POINTS}
