@@ -22,17 +22,21 @@ router.get(
   requireAuth,
   asyncHandler(async (req, res) => {
     const limit = Math.min(Number(req.query.limit) || 30, 100);
+    // Retired reminders (event + grace already passed) are hidden, so a member
+    // who never taps the bell does not accumulate stale rows day after day.
     const { rows } = await query(
       `SELECT id, kind, title, body, link, read_at, created_at
        FROM notifications
        WHERE user_id = $1
+         AND (expires_at IS NULL OR expires_at > now())
        ORDER BY created_at DESC
        LIMIT $2`,
       [req.user.sub, limit],
     );
     const { rows: countRows } = await query(
       `SELECT COUNT(*)::int AS unread FROM notifications
-       WHERE user_id = $1 AND read_at IS NULL`,
+       WHERE user_id = $1 AND read_at IS NULL
+         AND (expires_at IS NULL OR expires_at > now())`,
       [req.user.sub],
     );
     res.json({

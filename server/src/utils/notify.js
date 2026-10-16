@@ -60,14 +60,18 @@ export function escapeHtml(value) {
 /**
  * Create a notification for a user. Returns the row when it was newly
  * created, or null when it already existed (dedupe_key hit).
+ *
+ * `expiresAt` is the instant after which the reminder is retired from the
+ * in-app feed (event time + grace). Pass null for a notification with no
+ * natural event to count down to.
  */
-export async function createNotification({ userId, kind, title, body, link, dedupeKey }) {
+export async function createNotification({ userId, kind, title, body, link, dedupeKey, expiresAt }) {
   const { rows } = await query(
-    `INSERT INTO notifications (user_id, kind, title, body, link, dedupe_key)
-     VALUES ($1, $2, $3, $4, $5, $6)
+    `INSERT INTO notifications (user_id, kind, title, body, link, dedupe_key, expires_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7)
      ON CONFLICT (user_id, dedupe_key) DO NOTHING
-     RETURNING id, user_id, kind, title, body, link, dedupe_key, created_at`,
-    [userId, kind, title, body ?? null, link ?? null, dedupeKey],
+     RETURNING id, user_id, kind, title, body, link, dedupe_key, created_at, expires_at`,
+    [userId, kind, title, body ?? null, link ?? null, dedupeKey, expiresAt ?? null],
   );
   return rows[0] ?? null;
 }
@@ -203,8 +207,18 @@ async function sendPushToSubscription(sub, row) {
   }
 }
 
-/** Prune in-app feed rows past the retention period. */
+/**
+ * Prune in-app feed rows. Two rules:
+ *   1. Rows whose event has passed more than the expiry grace are retired
+ *      (this is what stops unread reminders from compounding day after day).
+ *   2. Any remaining row past the retention period is dropped as a backstop
+ *      for legacy rows with no `expires_at`.
+ */
 export async function pruneOldNotifications() {
+  await query(
+    `DELETE FROM notifications
+      WHERE expires_at IS NOT NULL AND expires_at < now()`,
+  );
   await query(
     `DELETE FROM notifications WHERE created_at < now() - make_interval(days => $1)`,
     [Math.max(1, config.notifications.retentionDays)],

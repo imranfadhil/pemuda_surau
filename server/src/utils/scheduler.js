@@ -132,6 +132,8 @@ async function prayerReminders(now) {
     const checkedIn = new Set(checkedRows.map((r) => r.id));
     const adhan = times[prayer];
 
+    // Retire the reminder a fixed grace after the adhan it counts down to.
+    const expiresAt = new Date(adhan.getTime() + config.notifications.expireAfterMinutes * 60 * 1000);
     for (const userId of audience) {
       if (checkedIn.has(userId)) continue;
       await createNotification({
@@ -141,6 +143,7 @@ async function prayerReminders(now) {
         body: `Adhan at ${formatTimeInTz(adhan)}. Come to the surau and check in when you arrive.`,
         link: '/check-in',
         dedupeKey: `prayer:${date}:${prayer}`,
+        expiresAt,
       });
     }
   }
@@ -193,6 +196,8 @@ async function programReminders(now) {
       [program.id],
     );
 
+    // Retire the reminder a fixed grace after the program has started.
+    const expiresAt = new Date(start.getTime() + config.notifications.expireAfterMinutes * 60 * 1000);
     for (const { user_id: userId } of joined) {
       await createNotification({
         userId,
@@ -201,6 +206,7 @@ async function programReminders(now) {
         body: program.location ? `At ${program.location}.` : 'See you there!',
         link: '/programs',
         dedupeKey: `program:${program.id}:${sessionKey}`,
+        expiresAt,
       });
     }
   }

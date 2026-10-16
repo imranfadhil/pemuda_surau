@@ -359,7 +359,10 @@ Members who **already checked in** for that prayer are skipped — no nagging af
 **Channels.** Every reminder is stored in the `notifications` table, which is both the
 in-app feed (the 🔔 bell in the top bar) *and* the delivery log:
 
-- **In-app feed** — always on; rows are pruned after `NOTIFY_RETENTION_DAYS` (default 30).
+- **In-app feed** — always on. A reminder is retired `NOTIFY_EXPIRE_AFTER_MINUTES`
+  (default 60) **after the event** it refers to (the adhan / program start), so unread
+  reminders never pile up day after day; any remaining rows are pruned after
+  `NOTIFY_RETENTION_DAYS` (default 3).
 - **Telegram** — sent to members who linked their account; toggled per member.
 - **Web Push** — sent to devices that enabled it from the bell; needs VAPID keys.
 

@@ -88,8 +88,14 @@ export const config = {
     // How long an undeliverable notification keeps being retried before we
     // give up (it stays visible in the in-app feed regardless).
     retryWindowHours: Number(process.env.NOTIFY_RETRY_WINDOW_HOURS || 2),
-    // In-app feed rows older than this are pruned on each tick.
-    retentionDays: Number(process.env.NOTIFY_RETENTION_DAYS || 30),
+    // A reminder is only useful around its event. It stays in the in-app feed
+    // until this many minutes AFTER the event it refers to (adhan / program
+    // start), then it is retired automatically so unread badges and the feed
+    // never compound day after day.
+    expireAfterMinutes: Number(process.env.NOTIFY_EXPIRE_AFTER_MINUTES || 60),
+    // In-app feed rows older than this are pruned on each tick (backstop for
+    // rows with no `expires_at`, e.g. legacy data).
+    retentionDays: Number(process.env.NOTIFY_RETENTION_DAYS || 3),
   },
   // Web Push VAPID credentials. Generate with:
   //   npx web-push generate-vapid-keys

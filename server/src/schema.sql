@@ -325,6 +325,16 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_notifications_dedupe
 CREATE INDEX IF NOT EXISTS idx_notifications_user
   ON notifications (user_id, created_at DESC);
 
+-- A reminder stops being relevant shortly after the event it refers to (the
+-- adhan it is counting down to, or a program's start). `expires_at` is set at
+-- creation to "event time + grace" so the in-app feed can retire the row on its
+-- own: without it, a member who never taps the bell accumulates a new unread
+-- reminder every prayer and every program, forever. NULL = never expires
+-- (legacy rows; they still age out via the retention prune).
+ALTER TABLE notifications ADD COLUMN IF NOT EXISTS expires_at TIMESTAMPTZ;
+CREATE INDEX IF NOT EXISTS idx_notifications_expiry
+  ON notifications (expires_at) WHERE expires_at IS NOT NULL;
+
 -- Per-member delivery preferences. Absence of a row = all defaults (on).
 CREATE TABLE IF NOT EXISTS notification_prefs (
   user_id           UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
