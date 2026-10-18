@@ -48,9 +48,9 @@ template defaults. Regenerate at any time with `seed-config.bat -Force`.
 | `sync.bat` | Push code changes and restart (keeps server `.env`) |
 | `sync.bat --restart` | Push code and force a Docker rebuild |
 | `seed-config.bat` | Generate `config.bat` from `.env` (`-Force` to regenerate) |
-| `backup.bat` | Manage database backups (`--list`, `--restore`, `--logs`) |
+| `backup.bat` | Manage database backups (`--pull`, `--latest`, `--list`, `--restore`, `--logs`) |
 | `simulate.bat` | Seed / clear demo data (`--clear`, `--status`, `--total`, `--teachers`, `--ajk`, `--days`) |
-| `destroy.bat` | Delete the droplet and the DO SSH key |
+| `destroy.bat` | Delete the droplet and the DO SSH key (prompts twice; see [Shared droplets](#shared-droplets)) |
 
 ## Typical workflow
 
@@ -75,7 +75,9 @@ it to Cloudflare R2 (free tier). See **[../backup/README.md](../backup/README.md
 for setup and restore instructions.
 
 ```bat
-backup.bat              REM take a backup now
+backup.bat              REM take a backup now (on the droplet)
+backup.bat --latest     REM download the newest dump to your machine
+backup.bat --pull <file.dump>   REM download a specific dump
 backup.bat --list       REM list local + remote backups
 backup.bat --restore    REM restore the latest backup (DESTRUCTIVE)
 ```
@@ -175,6 +177,8 @@ webhook re-registration needed.
 | `OTP_CHANNEL` | `telegram` (free), `sms` (paid), or `console` |
 | `TELEGRAM_BOT_TOKEN` / `TELEGRAM_BOT_USERNAME` | Telegram bot credentials |
 | `SMS_PROVIDER` / `SMS_API_KEY` / `SMS_SENDER_ID` | SMS settings (only when `OTP_CHANNEL=sms`) |
+| `LOCAL_BACKUP_DIR` | Where `backup.bat --pull` saves dumps (`%USERPROFILE%\pemuda-surau-backups`) |
+| `BACKUP_ENCRYPT_PASSPHRASE` | Optional; encrypts pulled dumps (AES-256). Blank = plain dumps |
 
 ## Troubleshooting
 
@@ -201,3 +205,26 @@ webhook re-registration needed.
 - Droplet user is `root`; the app lives in `/opt/pemuda_surau`.
 - Data persists on the droplet's disk across restarts; `destroy.bat` deletes it.
 - The local SSH key file is kept when destroying, so re-deploying is fast.
+
+## Shared droplets
+
+`deploy.bat` always creates a **dedicated** droplet per `DROPLET_NAME`, so by default this
+stack cannot interfere with anything else. Everything the stack creates is namespaced by the
+Compose project name (the basename of `REMOTE_DIR`, e.g. `pemuda_surau`) — its own bridge
+network, named volumes, and containers — and it never runs host-global Docker commands
+(`system prune`, `stop`, `rm`, …).
+
+Two things to know if you deliberately co-locate other apps on the same droplet:
+
+- **`destroy.bat` deletes the whole droplet**, not just this app. Before deleting, it counts
+  the host's containers against the ones belonging to this Compose project and, if foreign
+  containers are found, lists them and demands the droplet name be typed a second time.
+  Always use a separate droplet unless you intend to tear down everything.
+- **Give each app a unique `WEB_PORT`.** `web` is the only service publishing a host port
+  (loopback-only by default); if the port is taken, `docker compose up` fails rather than
+  disturbing the app that owns it.
+
+One more check is scoped for the same reason: `configure-env.sh` rotates
+`POSTGRES_PASSWORD` only when *this* project's `db_data` volume is absent, so an unrelated
+stack's volume can no longer mask a fresh database and leave the placeholder password in
+place.

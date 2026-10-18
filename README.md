@@ -174,6 +174,14 @@ docker compose exec -T backup restore.sh --list   # list backups
 docker compose exec -T backup restore.sh --latest # restore newest (DESTRUCTIVE)
 ```
 
+To keep a copy **on your own machine**, use the deploy script — this streams the newest dump
+over SSH (and can encrypt it with a passphrase):
+
+```bat
+deploy\backup.bat --latest     REM download the newest dump
+deploy\backup.bat --pull <file.dump>   REM download a specific dump
+```
+
 Set `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, and `R2_BUCKET` in `.env` to
 enable offsite copies. Full setup, restore, and disaster-recovery steps are in
 **[backup/README.md](backup/README.md)**.

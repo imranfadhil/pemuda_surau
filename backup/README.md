@@ -52,13 +52,47 @@ R2_BUCKET=
 From your local machine (uses `deploy/config.bat`):
 
 ```bat
-deploy\backup.bat              REM take a backup now
+deploy\backup.bat              REM take a backup now (runs on the droplet)
 deploy\backup.bat --list       REM list local + remote backups
 deploy\backup.bat --logs       REM show recent backup logs
 deploy\backup.bat --restore    REM restore the latest backup (DESTRUCTIVE)
 ```
 
-Or directly on the droplet:
+### Downloading a dump to your machine
+
+`--pull` (alias `--latest`) streams the newest dump over SSH and saves it locally:
+
+```bat
+deploy\backup.bat --latest                                   REM newest dump
+deploy\backup.bat --pull pemuda_surau_2026-10-18_030000.dump REM a specific dump
+```
+
+Files land in `LOCAL_BACKUP_DIR` (default `%USERPROFILE%\pemuda-surau-backups`,
+settable in `deploy\config.bat`). If `pg_restore` is installed locally the
+download is verified by reading the dump's table of contents, so a truncated
+transfer is detected. The dump is piped through SSH rather than copied with
+`scp`, so only the SSH key is needed.
+
+#### Optional encryption
+
+Set `BACKUP_ENCRYPT_PASSPHRASE` in `deploy\config.bat` and dumps land as
+`.dump.enc`, encrypted with AES-256-CBC (PBKDF2, 200 000 iterations). The
+plaintext never touches your local disk, and the passphrase is passed to
+`openssl` through a temporary file rather than the command line, so it does not
+appear in the process list. Store it in a password manager — **an encrypted dump
+is unrecoverable without it**. Requires `openssl` on your `PATH`.
+
+To decrypt before restoring:
+
+```bat
+REM Put the passphrase alone in a file, with no trailing newline
+openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -pass file:pass.txt ^
+  -in "%USERPROFILE%\pemuda-surau-backups\pemuda_surau_2026-10-18_030000.dump.enc" ^
+  -out restore.dump
+pg_restore -d <db> restore.dump
+```
+
+### On the droplet directly
 
 ```bash
 cd /opt/pemuda_surau

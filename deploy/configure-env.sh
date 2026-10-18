@@ -28,7 +28,13 @@ fi
 # Rotate the DB password ONLY before the database volume exists. Postgres
 # applies POSTGRES_PASSWORD on first init only, so rotating it after the volume
 # is created would leave the DB expecting the old password and break the API.
-if ! docker volume ls -q | grep -q '_db_data$'; then
+#
+# Scope the check to THIS compose project (`-p` defaults to the basename of the
+# working directory, i.e. the app dir name). Listing every volume on the host
+# would match an unrelated stack's `db_data` and wrongly treat a fresh database
+# as already initialised, leaving the weak .env.example password in place.
+VOLUME_SCOPE=$(basename "$REMOTE_DIR")
+if ! docker volume ls -q | grep -q "^${VOLUME_SCOPE}_db_data$"; then
   if grep -q '^POSTGRES_PASSWORD=change_this' .env; then
     sed -i "s#^POSTGRES_PASSWORD=.*#POSTGRES_PASSWORD=$(openssl rand -hex 16)#" .env
   fi

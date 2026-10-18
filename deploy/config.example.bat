@@ -33,6 +33,15 @@ REM Your public domain (e.g. surau.example.com). Used for CORS + shown after dep
 REM Leave blank if you only use the droplet IP.
 set DOMAIN=
 
+REM Where backup.bat --pull saves dumps on your machine. Supports %USERPROFILE%.
+REM Leave blank to use the default: %USERPROFILE%\pemuda-surau-backups
+set LOCAL_BACKUP_DIR=%USERPROFILE%\pemuda-surau-backups
+
+REM Optional passphrase to encrypt pulled dumps with openssl (AES-256). If set,
+REM the .dump file lands locally as .dump.enc and is useless without this value,
+REM so store it in a password manager. Leave blank for plain dumps.
+set BACKUP_ENCRYPT_PASSPHRASE=
+
 REM Comma-separated phone numbers that get admin rights on first login
 set ADMIN_PHONES=
 
