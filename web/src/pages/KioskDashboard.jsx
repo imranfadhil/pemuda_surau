@@ -59,7 +59,7 @@ function useClock() {
 
 function LeaderColumn({ title, rows, category, duplicates, onSelect, selectedId, periodKey }) {
   return (
-    <div className="kiosk-leader-col">
+    <div className={`kiosk-leader-col kiosk-leader-col-${periodKey}`}>
       <div className="kiosk-leader-head">{title}</div>
       {rows.length === 0 ? (
         <p className="muted" style={{ paddingTop: 12 }}>No activity yet.</p>
@@ -138,7 +138,7 @@ function MobileNotice() {
  * wall display (no login QR, no rotation), but laid out as a normal scrolling
  * page so it works on a phone.
  */
-function MobileDashboard({ stats, weeklyChart, monthly, yearly, category, catIndex, onSelectCat, duplicates, onSelectMember, selectedId }) {
+function MobileDashboard({ stats, weeklyChart, monthly, lastMonth, yearly, category, catIndex, onSelectCat, duplicates, onSelectMember, selectedId }) {
   const dateStr = new Date().toLocaleDateString(undefined, {
     weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
   });
@@ -210,6 +210,15 @@ function MobileDashboard({ stats, weeklyChart, monthly, yearly, category, catInd
             onSelect={onSelectMember}
             selectedId={selectedId}
             periodKey="month"
+          />
+          <LeaderColumn
+            title="Last month"
+            rows={lastMonth}
+            category={category}
+            duplicates={duplicates}
+            onSelect={onSelectMember}
+            selectedId={selectedId}
+            periodKey="last_month"
           />
           <LeaderColumn
             title="This year"
@@ -303,6 +312,7 @@ export default function KioskDashboard({ publicHome = false }) {
   const [stats, setStats] = useState(null);
   const [weekly, setWeekly] = useState([]);
   const [monthly, setMonthly] = useState([]);
+  const [lastMonth, setLastMonth] = useState([]);
   const [yearly, setYearly] = useState([]);
   const [catIndex, setCatIndex] = useState(0);
   const [loginUrl, setLoginUrl] = useState('');
@@ -315,10 +325,17 @@ export default function KioskDashboard({ publicHome = false }) {
 
   // Names are not unique, so tell same-named members apart by phone last-4 —
   // but only when a collision actually exists in the displayed boards.
-  const duplicates = duplicateNameKeys([...monthly, ...yearly]);
+  const duplicates = duplicateNameKeys([...monthly, ...lastMonth, ...yearly]);
+
+  // The board a row was picked from, so prev/next walk that same column.
+  const boardFor = (periodKey) => {
+    if (periodKey === 'year') return yearly;
+    if (periodKey === 'last_month') return lastMonth;
+    return monthly;
+  };
 
   const openHighlight = (row, periodKey) => {
-    const list = periodKey === 'year' ? yearly : monthly;
+    const list = boardFor(periodKey);
     const idx = Math.max(0, list.findIndex((r) => r.id === row.id));
     setHighlight({ list, index: idx, period: periodKey, id: row.id });
   };
@@ -345,14 +362,19 @@ export default function KioskDashboard({ publicHome = false }) {
     return () => clearInterval(t);
   }, []);
 
-  // Monthly + yearly leaderboards for the active category.
+  // Monthly, previous-month and yearly leaderboards for the active category.
   useEffect(() => {
     let active = true;
     const load = () =>
-      Promise.all([api.leaderboard('month', category.key), api.leaderboard('year', category.key)])
-        .then(([m, y]) => {
+      Promise.all([
+        api.leaderboard('month', category.key),
+        api.leaderboard('last_month', category.key),
+        api.leaderboard('year', category.key),
+      ])
+        .then(([m, lm, y]) => {
           if (!active) return;
           setMonthly(m.leaderboard.slice(0, TOP_N));
+          setLastMonth(lm.leaderboard.slice(0, TOP_N));
           setYearly(y.leaderboard.slice(0, TOP_N));
         })
         .catch(() => {});
@@ -412,6 +434,7 @@ export default function KioskDashboard({ publicHome = false }) {
         stats={stats}
         weeklyChart={weeklyChart}
         monthly={monthly}
+        lastMonth={lastMonth}
         yearly={yearly}
         category={category}
         catIndex={catIndex}
@@ -465,6 +488,15 @@ export default function KioskDashboard({ publicHome = false }) {
                 onSelect={openHighlight}
                 selectedId={highlight?.id}
                 periodKey="month"
+              />
+              <LeaderColumn
+                title="Last month"
+                rows={lastMonth}
+                category={category}
+                duplicates={duplicates}
+                onSelect={openHighlight}
+                selectedId={highlight?.id}
+                periodKey="last_month"
               />
               <LeaderColumn
                 title="This year"

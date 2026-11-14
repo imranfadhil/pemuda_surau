@@ -23,8 +23,10 @@ const CATEGORY_COLUMNS = {
   merits: 'merits',
 };
 
-// Whitelisted ranking periods.
-const PERIODS = ['month', 'year', 'all'];
+// Whitelisted ranking periods. `last_month` is the previous calendar month
+// (used for the prize-giving board on the kiosk), so it is the only period with
+// an upper bound as well as a start date.
+const PERIODS = ['month', 'last_month', 'year', 'all'];
 
 // Simple guard so a malformed id can't reach a `::uuid` cast in the driver.
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -190,7 +192,7 @@ router.get(
  * Leaderboard / ranking across categories.
  *
  * Query params:
- *   period   = month | year | all   (default: all)
+ *   period   = month | last_month | year | all   (default: all)
  *   category = overall | attendance | recitation | memorization | merits
  *              (default: overall)
  *
@@ -206,10 +208,17 @@ router.get(
     const { rows } = await query(
       `WITH period AS (
          SELECT CASE
-           WHEN $1 = 'month' THEN date_trunc('month', CURRENT_DATE)::date
-           WHEN $1 = 'year'  THEN date_trunc('year', CURRENT_DATE)::date
+           WHEN $1 = 'month'      THEN date_trunc('month', CURRENT_DATE)::date
+           WHEN $1 = 'last_month' THEN (date_trunc('month', CURRENT_DATE) - INTERVAL '1 month')::date
+           WHEN $1 = 'year'       THEN date_trunc('year', CURRENT_DATE)::date
            ELSE NULL
-         END AS start_date
+         END AS start_date,
+         -- Only the previous-month window has an upper bound; every other
+         -- period runs up to now.
+         CASE
+           WHEN $1 = 'last_month' THEN date_trunc('month', CURRENT_DATE)::date
+           ELSE NULL
+         END AS end_date
        ),
        att AS (
          SELECT a.user_id,
@@ -223,7 +232,8 @@ router.get(
                   ELSE 5
                 END), 0)::int AS attendance_points
          FROM attendance a, period p
-         WHERE p.start_date IS NULL OR a.attendance_date >= p.start_date
+         WHERE (p.start_date IS NULL OR a.attendance_date >= p.start_date)
+           AND (p.end_date IS NULL OR a.attendance_date < p.end_date)
          GROUP BY a.user_id
        ),
        rec AS (
@@ -231,6 +241,7 @@ router.get(
          FROM quran_logs q, period p
          WHERE q.kind = 'recitation'
            AND (p.start_date IS NULL OR q.logged_date >= p.start_date)
+           AND (p.end_date IS NULL OR q.logged_date < p.end_date)
          GROUP BY q.user_id
        ),
        mem AS (
@@ -238,12 +249,14 @@ router.get(
          FROM quran_logs q, period p
          WHERE q.kind = 'memorization'
            AND (p.start_date IS NULL OR q.logged_date >= p.start_date)
+           AND (p.end_date IS NULL OR q.logged_date < p.end_date)
          GROUP BY q.user_id
        ),
        mer AS (
          SELECT m.user_id, COALESCE(SUM(m.points), 0)::int AS merits
          FROM merits m, period p
-         WHERE p.start_date IS NULL OR m.awarded_at >= p.start_date
+         WHERE (p.start_date IS NULL OR m.awarded_at >= p.start_date)
+           AND (p.end_date IS NULL OR m.awarded_at < p.end_date)
          GROUP BY m.user_id
        ),
        prog AS (
@@ -251,6 +264,7 @@ router.get(
          FROM program_attendance pa, period p
          WHERE pa.checked_in_at IS NOT NULL
            AND (p.start_date IS NULL OR pa.checked_in_at >= p.start_date)
+           AND (p.end_date IS NULL OR pa.checked_in_at < p.end_date)
          GROUP BY pa.user_id
        )
        SELECT u.id, u.full_name, u.avatar_url, u.guardian_id,
@@ -310,10 +324,15 @@ router.get(
     const { rows } = await query(
       `WITH period AS (
          SELECT CASE
-           WHEN $2 = 'month' THEN date_trunc('month', CURRENT_DATE)::date
-           WHEN $2 = 'year'  THEN date_trunc('year', CURRENT_DATE)::date
+           WHEN $2 = 'month'      THEN date_trunc('month', CURRENT_DATE)::date
+           WHEN $2 = 'last_month' THEN (date_trunc('month', CURRENT_DATE) - INTERVAL '1 month')::date
+           WHEN $2 = 'year'       THEN date_trunc('year', CURRENT_DATE)::date
            ELSE NULL
-         END AS start_date
+         END AS start_date,
+         CASE
+           WHEN $2 = 'last_month' THEN date_trunc('month', CURRENT_DATE)::date
+           ELSE NULL
+         END AS end_date
        ),
        att AS (
          SELECT COUNT(*)::int AS attendance,
@@ -327,30 +346,35 @@ router.get(
          FROM attendance a, period p
          WHERE a.user_id = $1
            AND (p.start_date IS NULL OR a.attendance_date >= p.start_date)
+           AND (p.end_date IS NULL OR a.attendance_date < p.end_date)
        ),
        rec AS (
          SELECT COUNT(*)::int AS recitation
          FROM quran_logs q, period p
          WHERE q.user_id = $1 AND q.kind = 'recitation'
            AND (p.start_date IS NULL OR q.logged_date >= p.start_date)
+           AND (p.end_date IS NULL OR q.logged_date < p.end_date)
        ),
        mem AS (
          SELECT COUNT(*)::int AS memorization
          FROM quran_logs q, period p
          WHERE q.user_id = $1 AND q.kind = 'memorization'
            AND (p.start_date IS NULL OR q.logged_date >= p.start_date)
+           AND (p.end_date IS NULL OR q.logged_date < p.end_date)
        ),
        mer AS (
          SELECT COALESCE(SUM(m.points), 0)::int AS merits
          FROM merits m, period p
          WHERE m.user_id = $1
            AND (p.start_date IS NULL OR m.awarded_at >= p.start_date)
+           AND (p.end_date IS NULL OR m.awarded_at < p.end_date)
        ),
        prog AS (
          SELECT COALESCE(SUM(pa.bonus_points), 0)::int AS programs
          FROM program_attendance pa, period p
          WHERE pa.user_id = $1 AND pa.checked_in_at IS NOT NULL
            AND (p.start_date IS NULL OR pa.checked_in_at >= p.start_date)
+           AND (p.end_date IS NULL OR pa.checked_in_at < p.end_date)
        )
        SELECT u.id, u.full_name, u.avatar_url,
               g.full_name AS guardian_name,
