@@ -348,7 +348,7 @@ router.get(
        LEFT JOIN attendance a ON a.user_id = u.id AND a.attendance_date = $2
        WHERE u.id = $1 OR u.guardian_id = $1 OR u.co_guardian_id = $1
        GROUP BY u.id
-       ORDER BY (u.guardian_id IS NOT NULL), u.created_at ASC`,
+       ORDER BY (u.id <> $1), (u.guardian_id IS NOT NULL), u.created_at ASC`,
       [req.user.sub, date],
     );
     res.json({
@@ -356,7 +356,7 @@ router.get(
       members: rows.map((r) => ({
         id: r.id,
         fullName: r.full_name,
-        isDependent: Boolean(r.guardian_id),
+        isDependent: r.id !== req.user.sub,
         hasFace: r.has_face,
         prayers: r.prayers,
       })),

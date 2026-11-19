@@ -105,7 +105,7 @@ async function handleContactShare(chatId, message) {
     return;
   }
 
-  if (user.guardian_id) {
+  if (user.guardian_id && !user.phone) {
     await sendTelegramMessage(
       chatId,
       'This is a dependent account. Please ask your guardian to check in for you.',

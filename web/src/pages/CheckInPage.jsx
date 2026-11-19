@@ -282,8 +282,8 @@ export default function CheckInPage() {
 
         {selected && !selected.hasFace && (
           <div className="alert alert-info">
-            {selected.isDependent ? (
-              `${selected.fullName} has no face enrolled yet. Ask your guardian to enroll it from the Family page.`
+            {selected.isDependent && !selfCheckIn ? (
+              `${selected.fullName} has no face enrolled yet. Enroll it from the Family page.`
             ) : (
               <>
                 You need to register your face before you can check in.{' '}
