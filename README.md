@@ -21,6 +21,10 @@ statistics, rankings, and program management.
   automatically from the current time; each prayer has a check-in window (15 min before the
   adhan to 60 min after) fetched from the Aladhan API.
 - 🏆 **Dashboard & leaderboard** — stats, 7-day chart, per-prayer breakdown, rankings
+- 🎤 **Prize-giving highlight** — tap a member on the kiosk (or the member dashboard) to
+  present their full performance full-screen, with prev/next and an auto-playing slideshow.
+  The kiosk shows **This month**, **Last month** and **This year** boards, so the ceremony can
+  present the month that has just finished.
 - 📅 **Programs** — upcoming activities with join/leave, posters, links and weekly recurrence
   (e.g. every Mon–Wed, Maghrib to Isyak). Admins can opt to award **bonus points** (10–50)
   to members who check in.
@@ -577,7 +581,8 @@ Auth column: **–** = public, **user** = any logged-in member, **cap** = requir
 | GET/POST | `/api/activity/quran` | cap `manageQuran` (list) / user (log) | List / log Quran activity || PUT/DELETE | `/api/activity/quran/:id` | user | Edit / delete a Quran log |
 | GET | `/api/dashboard/stats` | – | Overall stats |
 | GET | `/api/dashboard/weekly` | – | Weekly activity (last 7 days) |
-| GET | `/api/dashboard/leaderboard` | – | Rankings (`?period=month\|year\|all&category=…`) |
+| GET | `/api/dashboard/leaderboard` | – | Rankings (`?period=month\|last_month\|year\|all&category=…`) |
+| GET | `/api/dashboard/member/:id` | – | One member's full summary (`?period=…`) for the prize-giving highlight |
 | GET | `/api/dashboard/me/breakdown` | user | My per-prayer counts |
 | GET | `/api/programs` | user | List programs |
 | POST/PUT/DELETE | `/api/programs[/:id]` | admin | Manage programs |

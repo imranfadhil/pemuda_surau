@@ -1434,13 +1434,20 @@ textarea:focus {
   background: var(--teal-600);
 }
 
+/* Three boards side by side: this month, last month (prize giving) and this
+   year. The last-month column is highlighted so it stands out on the wall. */
 .kiosk-leader-grid {
   flex: 1;
   min-height: 0;
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 24px;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 20px;
   margin-top: 12px;
+}
+
+.kiosk-leader-col-last_month .kiosk-leader-head {
+  color: var(--teal-700);
+  border-bottom-color: var(--teal-200);
 }
 
 .kiosk-leader-col {
@@ -2061,7 +2068,7 @@ textarea:focus {
 
 .mobile-leader-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 20px;
 }
 

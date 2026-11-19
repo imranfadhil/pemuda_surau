@@ -142,9 +142,12 @@ export const CATEGORIES = [
 
 export const CATEGORY_LABELS = Object.fromEntries(CATEGORIES.map((c) => [c.key, c.label]));
 
-// Ranking periods.
+// Ranking periods. `last_month` is the previous calendar month — used for the
+// prize-giving board on the kiosk, where the ceremony presents the month that
+// has just finished.
 export const PERIODS = [
   { key: 'month', label: 'This month' },
+  { key: 'last_month', label: 'Last month' },
   { key: 'year', label: 'This year' },
   { key: 'all', label: 'All time' },
 ];
