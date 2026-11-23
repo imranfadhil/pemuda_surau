@@ -53,12 +53,10 @@ export const config = {
     enabled: (process.env.GEOFENCE_ENABLED || 'true') !== 'false',
     radiusMeters: Number(process.env.GEOFENCE_RADIUS_METERS || 150),
   },
-  // Registration gate: a NEW account may only be created within this radius of
-  // the surau (anti-abuse). Deliberately far wider than the check-in radius -
-  // it covers the "go home first, then sign up" gap. Applies to new accounts
-  // only, so existing members can always log in from anywhere.
+  // Registration gate: by default disabled so new members can register from
+  // anywhere. Check-ins still strictly require being at the surau (see geofence above).
   registration: {
-    geofenceEnabled: (process.env.REGISTRATION_GEOFENCE_ENABLED || 'true') !== 'false',
+    geofenceEnabled: (process.env.REGISTRATION_GEOFENCE_ENABLED || 'false') === 'true',
     radiusMeters: Number(process.env.REGISTRATION_GEOFENCE_RADIUS_METERS || 1500),
   },
   // Quran self-logging: every log must be at the surau, and at most one log per
