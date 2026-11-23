@@ -143,12 +143,18 @@ async function handleContactShare(chatId, message) {
     ? `✅ Welcome! We've created your account for ${user.phone}.\n\n`
     : `✅ Linked! You'll now receive your login codes here.\n\n`;
 
+  const webAppUrl = config.publicUrl ? `${config.publicUrl.replace(/\/$/, '')}/login` : '';
+  const actionPrompt = webAppUrl
+    ? `\n\n👉 <b><a href="${webAppUrl}">Tap here to open the app &amp; sign in</a></b>`
+    : '\n\nEnter it in the app to sign in.';
+
   await sendTelegramMessage(
     chatId,
     intro +
       `Your login code is <b>${code}</b>.\n` +
-      `It expires in ${config.otpTtlMinutes} minutes. Enter it in the app to sign in.` +
-      (isNewUser ? '\n\nAfter signing in, complete your profile and enroll your face.' : ''),
+      `It expires in ${config.otpTtlMinutes} minutes.` +
+      actionPrompt +
+      (isNewUser ? '\n\nAfter signing in, please complete your profile (name, date of birth, and address).' : ''),
     { replyMarkup: { remove_keyboard: true } },
   );
 }

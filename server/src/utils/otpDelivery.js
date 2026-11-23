@@ -13,9 +13,13 @@ import { sendTelegramMessage, isTelegramConfigured } from './telegram.js';
  * Returns { channel, ok, error? } so callers can tell the user what happened.
  */
 export async function deliverOtp({ user, phone, code }) {
+  const webAppUrl = config.publicUrl ? `${config.publicUrl.replace(/\/$/, '')}/login` : '';
+  const webAppLink = webAppUrl ? `\n\n👉 <b><a href="${webAppUrl}">Tap to open app</a></b>` : '';
+
   const message =
     `Your Pemuda Surau Al-Abqori verification code is <b>${code}</b>.\n` +
-    `It expires in ${config.otpTtlMinutes} minutes.`;
+    `It expires in ${config.otpTtlMinutes} minutes.` +
+    webAppLink;
 
   // 1. Telegram (preferred - free)
   if (user?.telegram_chat_id && isTelegramConfigured()) {

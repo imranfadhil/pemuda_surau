@@ -51,11 +51,33 @@ export default function HomePage() {
   const next = win?.next || null;
   const activePrayer = current?.prayer || null;
   const dependents = family.filter((m) => m.isDependent);
+  const firstName = user?.fullName && user.fullName !== 'New Member' ? user.fullName.split(' ')[0] : null;
+  const isProfileIncomplete = !user?.fullName || user.fullName === 'New Member' || !user?.birthDate;
 
   return (
     <div>
-      <h1 className="page-title">Assalamualaikum, {user?.fullName?.split(' ')[0] || 'friend'} 👋</h1>
+      <h1 className="page-title">
+        Assalamualaikum{firstName ? `, ${firstName}` : ''} 👋
+      </h1>
       <p className="page-sub">Your prayer, Quran and good deeds today.</p>
+
+      {isProfileIncomplete ? (
+        <div className="alert alert-warn" style={{ marginBottom: 16 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
+            <div>
+              <strong>Complete your profile:</strong> You haven't updated your full name and details yet.
+            </div>
+            <Link to="/register" className="btn btn-sm">
+              Update profile →
+            </Link>
+          </div>
+        </div>
+      ) : !user?.hasFace ? (
+        <div className="alert alert-info" style={{ marginBottom: 16 }}>
+          You haven't enrolled your face yet.{' '}
+          <Link to="/register"><strong>Enroll face for check-in →</strong></Link>
+        </div>
+      ) : null}
 
       <div className="card">
         <h2 className="card-title">🕌 {SURAU.name}</h2>
@@ -69,12 +91,6 @@ export default function HomePage() {
 
       <InstallPrompt variant="card" />
 
-      {!user?.hasFace && (
-        <div className="alert alert-info">
-          You haven't enrolled your face yet.{' '}
-          <Link to="/register"><strong>Complete registration →</strong></Link>
-        </div>
-      )}
 
       <div className="stat-grid" data-tour="home-stats">
         <div className="stat">
